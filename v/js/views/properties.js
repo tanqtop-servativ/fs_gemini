@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js';
 import { renderAuditHistory } from './audit.js';
 import { setupModalGuard } from '../modal_utils.js';
 import { getTenantId, renderAddressWithLink } from '../utils.js';
+import { uploadFile } from '../storage_utils.js';
 
 
 
@@ -563,21 +564,25 @@ async function openEditModal(prop) {
         if (!prop) return alert("Please save the property first before adding attachments.");
         const files = Array.from(e.target.files);
         console.log("Uploading", files.length, "attachments...");
+        const propId = prop.id; // Ensure propId is available for the new logic
         for (const file of files) {
-            const ext = file.name.split('.').pop();
-            const safeName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-            const path = `${prop.id}/attachments/${safeName}`;
-            const { error: upErr } = await supabase.storage.from('properties').upload(path, file);
-            if (upErr) { console.error("Upload failed:", upErr); continue; }
-            const { data } = supabase.storage.from('properties').getPublicUrl(path);
-            if (!data || !data.publicUrl) { console.error("Failed to get Public URL"); continue; }
-            const { data: newRow, error: dbErr } = await supabase.from('property_attachments').insert({
-                property_id: prop.id,
-                file_name: file.name,
-                storage_path: path,
-                public_url: data.publicUrl
-            }).select().single();
-            if (dbErr) console.error("DB Insert Failed:", dbErr); else attachments.unshift(newRow);
+            const fileName = `prop_${propId}_att_${Date.now()}_${file.name}`;
+
+            try {
+                const publicUrl = await uploadFile(file, fileName);
+
+                const { data: newRow, error: dbErr } = await supabase.from('property_attachments').insert({
+                    property_id: propId,
+                    file_name: file.name,
+                    storage_path: fileName,
+                    public_url: publicUrl
+                }).select().single();
+
+                if (dbErr) throw dbErr;
+                attachments.unshift(newRow); // Add the new row to the local array
+            } catch (err) {
+                alert("Error uploading attachment: " + err.message);
+            }
         }
         renderAttachments();
     });
@@ -652,20 +657,27 @@ async function openEditModal(prop) {
         console.log("Uploading", files.length, "files...");
         for (const file of files) {
             const ext = file.name.split('.').pop();
-            const safeName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-            const path = `${prop.id}/references/${safeName}`;
-            const { error: upErr } = await supabase.storage.from('properties').upload(path, file);
-            if (upErr) { console.error("Upload failed:", upErr); continue; }
-            const { data } = supabase.storage.from('properties').getPublicUrl(path);
-            if (!data || !data.publicUrl) { console.error("Failed to get Public URL"); continue; }
-            const { data: newRow, error: dbErr } = await supabase.from('property_reference_photos').insert({
-                property_id: prop.id,
-                storage_path: path,
-                public_url: data.publicUrl,
-                label: '',
-                sort_order: refPhotos.length // Append to end
-            }).select().single();
-            if (dbErr) console.error("DB Insert Failed:", dbErr); else refPhotos.push(newRow);
+            const path = `prop_${prop.id}_ref_${Date.now()}.${ext}`;
+
+            try {
+                const publicUrl = await uploadFile(file, path);
+
+                const { data: newRow, error: dbErr } = await supabase.from('property_reference_photos').insert({
+                    property_id: prop.id,
+                    storage_path: path,
+                    public_url: publicUrl,
+                    label: file.name, // Using file.name as initial label
+                    sort_order: refPhotos.length // Append to end
+                }).select().single();
+
+                if (dbErr) {
+                    console.error("DB Insert Failed:", dbErr);
+                } else {
+                    refPhotos.push(newRow);
+                }
+            } catch (err) {
+                alert("Error uploading: " + err.message);
+            }
         }
         renderRefPhotos();
     });
