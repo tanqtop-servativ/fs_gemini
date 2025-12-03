@@ -9,12 +9,15 @@ import { renderJobTemplates } from './views/job_templates.js';
 import { renderServiceOpportunities } from './views/service_opportunities.js';
 import { renderSuperuserDashboard } from './views/superuser.js';
 
+import { renderActivityFeed } from './views/activity_feed.js';
+
 // --- STATE ---
 window.currentUser = null;
 
 const MENU_ITEMS = [
     { id: 'dashboard', label: 'Live Status', icon: 'activity' },
-    { id: 'service_opportunities', label: 'Service Ops', icon: 'git-branch' }, // New Item
+    { id: 'activity', label: 'Activity Feed', icon: 'list' }, // New Item
+    { id: 'service_opportunities', label: 'Service Ops', icon: 'git-branch' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { type: 'separator' },
     { id: 'people', label: 'People', icon: 'users' },
@@ -28,13 +31,14 @@ const MENU_ITEMS = [
 
 const ROUTES = {
     'dashboard': renderDashboard,
+    'activity': renderActivityFeed, // New Route
     'calendar': renderCalendar,
     'properties': renderProperties,
     'people': renderPeople,
     'roles': renderRoles,
     'bom': renderBOM,
     'job_templates': renderJobTemplates,
-    'service_opportunities': renderServiceOpportunities, // New Route
+    'service_opportunities': renderServiceOpportunities,
     'superuser': renderSuperuserDashboard
 };
 
@@ -265,6 +269,18 @@ export async function navigate(viewId, paramsString = null) {
 
     // 2. Container Reset
     const container = document.getElementById('main-canvas');
+
+    // CLEANUP PREVIOUS VIEW
+    if (window.currentViewCleanup) {
+        try {
+            window.currentViewCleanup();
+            console.log("🧹 Cleaned up previous view");
+        } catch (e) {
+            console.error("Cleanup error:", e);
+        }
+        window.currentViewCleanup = null;
+    }
+
     container.innerHTML = '';
 
     const loader = document.createElement('div');
@@ -287,7 +303,12 @@ export async function navigate(viewId, paramsString = null) {
 
         // Parse params
         const params = new URLSearchParams(paramsString);
-        await renderFn(container, params);
+
+        // Execute Render and capture Cleanup function
+        const cleanupFn = await renderFn(container, params);
+        if (typeof cleanupFn === 'function') {
+            window.currentViewCleanup = cleanupFn;
+        }
 
         console.log("✅ Rendered:", viewId);
     } catch (err) {

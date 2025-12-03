@@ -17,7 +17,12 @@ TABLES_TO_AUDIT = [
     "property_reference_photos",
     "property_assignments",
     "bom_template_items",
-    "person_roles"
+    "person_roles",
+    "bom_templates",
+    "properties",
+    "people",
+    "roles",
+    "tenants"
 ]
 
 def add_audit_triggers():
