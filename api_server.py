@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PORT = 3000
+PORT = 8080
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 

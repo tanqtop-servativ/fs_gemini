@@ -19,17 +19,24 @@ export async function renderAuditHistory(containerId, tableName, recordId) {
     // Let's stick to the requested scope: "Casita Code" change.
     // If Casita Code is in property_access_codes, we need to fetch logs for that table too.
 
-    let query = supabase
-        .from('audit_history_view')
-        .select('*');
+    let logs, error;
 
     if (tableName === 'properties') {
-        query = query.or(`and(table_name.eq.properties,record_id.eq.${rId}),and(table_name.eq.property_access_codes,new_values->>property_id.eq.${rId})`);
+        // Use the new RPC to fetch property + related history
+        const res = await supabase.rpc('get_property_audit_history', { p_property_id: rId });
+        logs = res.data;
+        error = res.error;
     } else {
-        query = query.eq('table_name', tableName).eq('record_id', rId);
+        // Standard single-table fetch
+        const res = await supabase
+            .from('audit_history_view')
+            .select('*')
+            .eq('table_name', tableName)
+            .eq('record_id', rId)
+            .order('changed_at', { ascending: false });
+        logs = res.data;
+        error = res.error;
     }
-
-    const { data: logs, error } = await query.order('changed_at', { ascending: false });
     console.log("Audit Logs:", logs, error);
 
     if (error) {

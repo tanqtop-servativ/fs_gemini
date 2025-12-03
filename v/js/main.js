@@ -6,6 +6,7 @@ import { renderPeople } from './views/people.js';
 import { renderBOM } from './views/bom.js';
 import { renderRoles } from './views/roles.js';
 import { renderJobTemplates } from './views/job_templates.js';
+import { renderServiceOpportunities } from './views/service_opportunities.js';
 import { renderSuperuserDashboard } from './views/superuser.js';
 
 // --- STATE ---
@@ -13,6 +14,7 @@ window.currentUser = null;
 
 const MENU_ITEMS = [
     { id: 'dashboard', label: 'Live Status', icon: 'activity' },
+    { id: 'service_opportunities', label: 'Service Ops', icon: 'git-branch' }, // New Item
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { type: 'separator' },
     { id: 'people', label: 'People', icon: 'users' },
@@ -32,6 +34,7 @@ const ROUTES = {
     'roles': renderRoles,
     'bom': renderBOM,
     'job_templates': renderJobTemplates,
+    'service_opportunities': renderServiceOpportunities, // New Route
     'superuser': renderSuperuserDashboard
 };
 
