@@ -1,0 +1,20 @@
+{
+    "roles": [
+        {
+            "name": "Manager",
+            "description": "Tenant Administrator with full access."
+        },
+        {
+            "name": "Technician",
+            "description": "Field staff who perform jobs."
+        },
+        {
+            "name": "Inspector",
+            "description": "Quality control staff who verify work."
+        },
+        {
+            "name": "Owner",
+            "description": "Property owner with read-only access to their properties."
+        }
+    ]
+}

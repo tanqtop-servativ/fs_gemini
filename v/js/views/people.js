@@ -29,7 +29,7 @@ export async function renderPeople(container) {
           <tbody id="people-body"><tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">Loading...</td></tr></tbody>
         </table>
       </div>`;
-    
+
     document.getElementById('btn-new-person').onclick = () => openEditPersonModal(null);
     await loadPeopleTable();
 }
@@ -56,7 +56,7 @@ async function loadPeopleTable() {
             <td class="px-6 py-4 text-right"><button class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button></td>
         </tr>
     `).join('');
-    
+
     window.viewPerson = (id) => openDetailPersonModal(id);
     lucide.createIcons();
 }
@@ -105,14 +105,14 @@ async function openDetailPersonModal(id) {
             </div>
         </div>
     </div>`;
-    
+
     lucide.createIcons();
     renderAuditHistory('audit-log-container', 'people', id);
 
     // Simple close for read-only
     const close = () => container.innerHTML = '';
     document.getElementById('btn-close').onclick = close;
-    container.firstElementChild.addEventListener('click', (e) => { if(e.target === e.currentTarget) close(); });
+    container.firstElementChild.addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
 
     document.getElementById('btn-edit').onclick = () => openEditPersonModal(p);
 }
@@ -121,9 +121,13 @@ async function openDetailPersonModal(id) {
 async function openEditPersonModal(person) {
     const tenantId = getTenantId();
     const container = document.getElementById('modal-container');
-    
-    const { data: roles } = await supabase.from('roles').select('*').eq('tenant_id', tenantId);
-    
+
+    // FIXED: Fetch Tenant Roles OR Global Roles
+    const { data: roles } = await supabase
+        .from('roles')
+        .select('*')
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+
     const currentRoleIds = person && person.role_ids ? person.role_ids : [];
 
     const roleChecks = roles && roles.length > 0 ? roles.map(r => `
@@ -133,9 +137,39 @@ async function openEditPersonModal(person) {
         </label>
     `).join('') : '<div class="text-gray-400 text-sm italic p-2">No roles defined.</div>';
 
+    // User Creation UI (Only for new people or those without a user_id)
+    const showUserCreation = !person || !person.user_id;
+
+    const userCreationHTML = showUserCreation ? `
+        <div class="mt-6 border-t pt-4">
+            <label class="flex items-center gap-2 cursor-pointer mb-4">
+                <input type="checkbox" id="chk-create-login" class="w-4 h-4 text-black rounded">
+                <span class="font-bold text-sm text-slate-900">Create User Login?</span>
+            </label>
+            
+            <div id="login-fields" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div class="flex gap-4 text-sm mb-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="auth_method" value="invite" checked>
+                        <span>Send Invite Email</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="auth_method" value="manual">
+                        <span>Set Password Manually</span>
+                    </label>
+                </div>
+                
+                <div id="manual-password-field" class="hidden">
+                    <input id="inp-password" type="password" class="w-full border p-2 rounded" placeholder="Temporary Password">
+                    <p class="text-xs text-gray-500 mt-1">Must be at least 6 characters.</p>
+                </div>
+            </div>
+        </div>
+    ` : `<div class="mt-4 text-xs text-green-600 font-bold flex items-center"><i data-lucide="check" class="w-3 h-3 mr-1"></i> User Login Active</div>`;
+
     container.innerHTML = `
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <h3 class="font-bold text-lg mb-4">${person ? 'Edit' : 'New'} Person</h3>
             <div class="space-y-3">
                 <div class="grid grid-cols-2 gap-3">
@@ -143,12 +177,15 @@ async function openEditPersonModal(person) {
                     <input id="inp-last" class="w-full border p-2 rounded" placeholder="Last Name" value="${person ? person.last_name || '' : ''}">
                 </div>
                 <input id="inp-email" class="w-full border p-2 rounded" placeholder="Email" value="${person ? person.email || '' : ''}">
+                
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-2">Assign Roles</label>
                     <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-100 rounded p-2">
                         ${roleChecks}
                     </div>
                 </div>
+
+                ${userCreationHTML}
             </div>
             <div class="flex justify-between mt-6 gap-3">
                  ${person ? `<button onclick="window.deletePerson(${person.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Delete</button>` : '<div></div>'}
@@ -163,36 +200,129 @@ async function openEditPersonModal(person) {
     // --- APPLY GUARD ---
     const safeClose = setupModalGuard('modal-container', () => { container.innerHTML = ''; });
     document.getElementById('btn-cancel').onclick = safeClose;
-    
+
+    // UI Toggles
+    if (showUserCreation) {
+        const chkCreate = document.getElementById('chk-create-login');
+        const loginFields = document.getElementById('login-fields');
+        const radios = document.getElementsByName('auth_method');
+        const passField = document.getElementById('manual-password-field');
+
+        chkCreate.onchange = () => {
+            loginFields.classList.toggle('hidden', !chkCreate.checked);
+        };
+
+        radios.forEach(r => {
+            r.onchange = () => {
+                passField.classList.toggle('hidden', r.value !== 'manual');
+            };
+        });
+    }
+
     // SAVE HANDLER
     document.getElementById('btn-save').onclick = async () => {
         const first = document.getElementById('inp-first').value;
-        if(!first) return alert("First Name required");
+        const last = document.getElementById('inp-last').value;
+        const email = document.getElementById('inp-email').value;
+        const btnSave = document.getElementById('btn-save');
 
+        if (!first) return alert("First Name required");
+        if (!email) return alert("Email required");
+
+        btnSave.innerText = "Saving...";
+        btnSave.disabled = true;
+
+        let userId = person ? person.user_id : null;
+
+        // 1. Handle User Creation (if checked)
+        const chkCreate = document.getElementById('chk-create-login');
+        if (chkCreate && chkCreate.checked) {
+            const method = document.querySelector('input[name="auth_method"]:checked').value;
+            const password = document.getElementById('inp-password').value;
+
+            if (method === 'manual' && (!password || password.length < 6)) {
+                btnSave.innerText = "Save";
+                btnSave.disabled = false;
+                return alert("Password must be at least 6 characters.");
+            }
+
+            try {
+                // Call local API Server
+                const response = await fetch('http://localhost:3000/create-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password,
+                        invite: method === 'invite'
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success && !result.user) {
+                    throw new Error(result.error || "Failed to create user");
+                }
+
+                // Get the new User ID
+                userId = result.user.id || result.user.user.id; // Structure varies slightly by endpoint
+                console.log("User Created:", userId);
+
+            } catch (e) {
+                console.error(e);
+                alert("Error creating login: " + e.message);
+                btnSave.innerText = "Save";
+                btnSave.disabled = false;
+                return;
+            }
+        }
+
+        // 2. Save Person Record
         const roleIds = Array.from(document.querySelectorAll('input[name="role_checkbox"]:checked'))
             .map(cb => parseInt(cb.value));
 
-        const { error } = await supabase.rpc('save_person_safe', {
+        // We need to pass user_id to save_person_safe if we have it
+        // But save_person_safe might not accept p_user_id yet.
+        // Let's check if we need to update the RPC or just do a direct update.
+        // For now, let's assume we update the person record directly if we have a userId
+
+        const { data: savedPerson, error } = await supabase.rpc('save_person_safe', {
             p_id: person ? person.id : null,
             p_tenant_id: tenantId,
             p_first: first,
-            p_last: document.getElementById('inp-last').value,
-            p_email: document.getElementById('inp-email').value,
+            p_last: last,
+            p_email: email,
             p_role_ids: roleIds
         });
 
         if (error) {
             alert("Database Error: " + error.message);
+            btnSave.innerText = "Save";
+            btnSave.disabled = false;
         } else {
+            // If we created a user, link it now (since save_person_safe might not handle it)
+            if (userId) {
+                await supabase.from('people').update({ user_id: userId }).eq('id', savedPerson);
+
+                // Also create a Profile entry for them so they can log in!
+                // The API server creates the Auth User, but WE need to create the public.profile
+                await supabase.from('profiles').insert({
+                    id: userId,
+                    tenant_id: tenantId,
+                    first_name: first,
+                    last_name: last,
+                    is_superuser: false
+                });
+            }
+
             container.innerHTML = '';
             loadPeopleTable();
         }
     };
 }
 
-window.deletePerson = async (id) => { 
-    if(!confirm("Delete this person?")) return;
+window.deletePerson = async (id) => {
+    if (!confirm("Delete this person?")) return;
     await supabase.from('people').delete().eq('id', id);
-    document.getElementById('modal-container').innerHTML = ''; 
-    loadPeopleTable(); 
+    document.getElementById('modal-container').innerHTML = '';
+    loadPeopleTable();
 };

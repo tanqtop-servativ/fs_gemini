@@ -38,7 +38,7 @@ const ROUTES = {
 // --- INIT ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("🚀 App Starting...");
-    checkAuth();
+    initApp();
 
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (toggleBtn) {
@@ -54,83 +54,116 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') window.attemptLogin();
         });
     }
-
-    // Handle Deep Links on Load
-    window.addEventListener('hashchange', () => {
-        if (!window.currentUser) return;
-        const hash = window.location.hash.substring(1); // remove #
-        const [view, params] = hash.split('?');
-        if (view && ROUTES[view]) navigate(view, params);
-    });
 });
 
 // --- AUTH ---
-function checkAuth() {
-    let stored = null;
-    try { stored = localStorage.getItem('mock_user'); } catch (e) { }
+async function initApp() {
+    // 1. Check for existing session
+    const { data: { session } } = await supabase.auth.getSession();
 
-    if (stored) {
-        window.currentUser = JSON.parse(stored);
-        showAppShell();
+    if (session) {
+        await handleSession(session);
     } else {
-        document.getElementById('login-screen').classList.remove('hidden');
-        lucide.createIcons();
+        renderLogin();
     }
+
+    // 2. Listen for auth changes
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("Auth State Change:", event, session);
+        if (event === 'SIGNED_IN' && session) {
+            await handleSession(session);
+        } else if (event === 'SIGNED_OUT') {
+            window.currentUser = null;
+            renderLogin();
+        }
+    });
+
+    // Handle hash routing
+    window.addEventListener('hashchange', () => {
+        if (window.currentUser) {
+            const hash = window.location.hash.slice(1) || 'dashboard';
+            navigate(hash);
+        }
+    });
 }
 
-window.attemptLogin = async () => {
+async function handleSession(session) {
+    // Fetch profile data (tenant_id, role, etc.)
+    // We need to query our 'public.profiles' table
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+    if (error || !profile) {
+        console.error("Profile fetch error:", error);
+        alert("Error loading user profile. Please contact support.");
+        await supabase.auth.signOut();
+        return;
+    }
+
+    // Construct currentUser object compatible with our app
+    window.currentUser = {
+        id: session.user.id,
+        email: session.user.email,
+        tenant_id: profile.tenant_id,
+        is_superuser: profile.is_superuser,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        name: `${profile.first_name} ${profile.last_name}`,
+        role: profile.is_superuser ? 'Super Admin' : 'Manager',
+        avatar: `https://ui-avatars.com/api/?name=${profile.first_name}+${profile.last_name}&background=random`
+    };
+
+    showAppShell();
+}
+
+function renderLogin() {
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('app-shell').classList.add('hidden');
+    document.getElementById('sidebar').classList.add('hidden');
+    document.getElementById('sidebar').classList.remove('flex');
+    if (window.lucide) window.lucide.createIcons();
+}
+window.attemptLogin = async function attemptLogin() {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
-    const errorMsg = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
+    const errorMsg = document.getElementById('login-error');
 
     if (!email || !password) {
-        alert("Please enter both email and password.");
+        errorMsg.innerText = "Please enter email and password.";
+        errorMsg.classList.remove('hidden');
         return;
     }
 
     btn.innerText = "Verifying...";
+    btn.disabled = true;
+    errorMsg.classList.add('hidden');
 
-    // Call updated RPC
-    const { data: result, error } = await supabase.rpc('verify_app_access', {
-        p_email: email,
-        p_password: password
+    // Supabase Auth Login
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
     });
 
     if (error) {
-        console.error(error);
-        alert("System Error: " + error.message);
-        btn.innerText = "Login";
+        console.error("Login failed:", error);
+        errorMsg.innerText = error.message;
+        errorMsg.classList.remove('hidden');
+        btn.innerText = "Sign In";
+        btn.disabled = false;
         return;
     }
 
-    // Result is now a JSON object: { success: true/false, user: {...}, message: "..." }
-    if (result && result.success) {
-        console.log("✅ Access Granted", result.user);
-
-        const user = {
-            id: result.user.id,
-            tenant_id: result.user.tenant_id,
-            name: `${result.user.first_name} ${result.user.last_name}`,
-            email: result.user.email,
-            role: result.user.is_superuser ? 'Super Admin' : 'Manager', // simplified role logic for now
-            is_superuser: result.user.is_superuser,
-            avatar: `https://ui-avatars.com/api/?name=${result.user.first_name}+${result.user.last_name}&background=random`
-        };
-
-        window.currentUser = user;
-        try { localStorage.setItem('mock_user', JSON.stringify(user)); } catch (e) { }
-        showAppShell();
-    } else {
-        console.warn("❌ Login Failed", result?.message);
-        errorMsg.innerText = result?.message || "Invalid credentials";
-        errorMsg.classList.remove('hidden');
-        btn.innerText = "Login";
-        document.getElementById('login-password').value = '';
-    }
+    // Success! The onAuthStateChange listener in initApp will handle the rest.
+    console.log("Login successful:", data);
 };
 
-window.logout = () => {
+window.logout = async () => {
+    await supabase.auth.signOut();
+    // onAuthStateChange will handle the renderLogin()
     window.currentUser = null;
     try { localStorage.removeItem('mock_user'); } catch (e) { }
     location.reload();
