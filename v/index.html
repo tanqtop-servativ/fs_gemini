@@ -49,12 +49,32 @@
                         class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center"
                         placeholder="admin@example.com">
                 </div>
-                <div class="mb-6">
                     <label class="block text-sm font-bold text-gray-700 mb-2 text-left">Password</label>
-                    <input type="password" id="login-password"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center"
-                        placeholder="••••••••">
+                    <div class="relative">
+                        <input type="password" id="login-password"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center pr-10"
+                            placeholder="••••••••">
+                        <button type="button" id="toggle-password" 
+                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none">
+                            <i data-lucide="eye" class="w-5 h-5"></i>
+                        </button>
+                    </div>
                 </div>
+                <script>
+                    document.getElementById('toggle-password').addEventListener('click', function() {
+                        const passwordInput = document.getElementById('login-password');
+                        const icon = this.querySelector('i');
+                        
+                        if (passwordInput.type === 'password') {
+                            passwordInput.type = 'text';
+                            icon.setAttribute('data-lucide', 'eye-off');
+                        } else {
+                            passwordInput.type = 'password';
+                            icon.setAttribute('data-lucide', 'eye');
+                        }
+                        lucide.createIcons();
+                    });
+                </script>
 
                 <button id="btn-login" onclick="window.attemptLogin()"
                     class="w-full bg-slate-900 text-white p-3 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">

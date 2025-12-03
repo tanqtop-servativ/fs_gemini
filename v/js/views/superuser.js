@@ -33,6 +33,23 @@ export async function renderSuperuserDashboard(container) {
                     <i data-lucide="plus" class="w-4 h-4"></i> New Tenant
                 </button>
             </div>
+            
+            ${window.currentUser.is_impersonating ? `
+            <div class="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-amber-100 p-2 rounded-full text-amber-600">
+                        <i data-lucide="venetian-mask" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-amber-900">Impersonating Tenant #${window.currentUser.tenant_id}</div>
+                        <div class="text-xs text-amber-700">You are viewing the system as if you belong to this tenant.</div>
+                    </div>
+                </div>
+                <button onclick="window.impersonateTenant(null)" class="bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 px-4 py-2 rounded font-bold text-sm shadow-sm transition-colors">
+                    Stop Impersonating
+                </button>
+            </div>
+            ` : ''}
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
@@ -54,7 +71,10 @@ export async function renderSuperuserDashboard(container) {
                                     <td class="px-6 py-4 text-gray-500 font-mono text-xs">#${t.id}</td>
                                     <td class="px-6 py-4 font-medium text-slate-900">${t.name}</td>
                                     <td class="px-6 py-4 text-gray-500">${new Date(t.created_at).toLocaleDateString()}</td>
-                                    <td class="px-6 py-4 text-right">
+                                    <td class="px-6 py-4 text-right flex justify-end gap-2">
+                                        <button onclick="window.impersonateTenant(${t.id})" class="text-indigo-600 hover:text-indigo-800 transition-colors p-1 font-bold text-xs border border-indigo-200 rounded bg-indigo-50 hover:bg-indigo-100 px-2" title="Switch to this Tenant">
+                                            Switch
+                                        </button>
                                         <button onclick="window.openManageTenantModal(${t.id}, '${t.name}')" class="text-gray-400 hover:text-indigo-600 transition-colors p-1" title="View Details">
                                             <i data-lucide="eye" class="w-5 h-5"></i>
                                         </button>

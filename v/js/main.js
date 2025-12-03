@@ -111,6 +111,7 @@ async function handleSession(session) {
         id: session.user.id,
         email: session.user.email,
         tenant_id: profile.tenant_id,
+        original_tenant_id: profile.tenant_id, // Keep track of real tenant
         is_superuser: profile.is_superuser,
         first_name: profile.first_name,
         last_name: profile.last_name,
@@ -119,8 +120,30 @@ async function handleSession(session) {
         avatar: `https://ui-avatars.com/api/?name=${profile.first_name}+${profile.last_name}&background=random`
     };
 
+    // Check for impersonation in localStorage (only if superuser)
+    if (window.currentUser.is_superuser) {
+        const impersonatedTenantId = localStorage.getItem('impersonated_tenant_id');
+        if (impersonatedTenantId) {
+            window.currentUser.tenant_id = parseInt(impersonatedTenantId);
+            window.currentUser.is_impersonating = true;
+            console.log("🕵️ Impersonating Tenant:", window.currentUser.tenant_id);
+        }
+    }
+
     showAppShell();
 }
+
+// --- IMPERSONATION ---
+window.impersonateTenant = function (tenantId) {
+    if (!window.currentUser || !window.currentUser.is_superuser) return;
+
+    if (tenantId) {
+        localStorage.setItem('impersonated_tenant_id', tenantId);
+    } else {
+        localStorage.removeItem('impersonated_tenant_id');
+    }
+    location.reload(); // Reload to refresh all views with new tenant_id
+};
 
 function renderLogin() {
     document.getElementById('login-screen').classList.remove('hidden');

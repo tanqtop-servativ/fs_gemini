@@ -32,7 +32,14 @@ export async function renderProperties(container) {
 }
 
 async function loadTableData() {
-    const { data: props, error } = await supabase.from('properties_enriched').select('*').eq('status', 'active').order('name');
+    let query = supabase.from('properties_enriched').select('*').eq('status', 'active');
+
+    // Filter by tenant_id if available (for impersonation or strict scoping)
+    if (window.currentUser && window.currentUser.tenant_id) {
+        query = query.eq('tenant_id', window.currentUser.tenant_id);
+    }
+
+    const { data: props, error } = await query.order('name');
     const tbody = document.getElementById('props-body');
     if (error) return tbody.innerHTML = `<tr><td colspan="4" class="text-red-500 px-6 py-4">Error: ${error.message}</td></tr>`;
     if (!props || !props.length) return tbody.innerHTML = `<tr><td colspan="4" class="text-center px-6 py-8 text-gray-400">No properties found.</td></tr>`;
