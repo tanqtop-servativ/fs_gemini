@@ -6,22 +6,19 @@ load_dotenv()
 
 DB_STRING = os.getenv("DB_CONNECTION_STRING")
 
-def inspect_func():
+def inspect_people():
     try:
         conn = psycopg2.connect(DB_STRING)
         cur = conn.cursor()
         
+        print("--- PEOPLE COLUMNS ---")
         cur.execute("""
-            SELECT pg_get_functiondef(oid) 
-            FROM pg_proc 
-            WHERE proname = 'record_audit_log';
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'people';
         """)
-        
-        row = cur.fetchone()
-        if row:
-            print(row[0])
-        else:
-            print("Function not found.")
+        for row in cur.fetchall():
+            print(f"{row[0]} ({row[1]})")
 
     except Exception as e:
         print(f"Error: {e}")
@@ -29,4 +26,4 @@ def inspect_func():
         if 'conn' in locals(): conn.close()
 
 if __name__ == "__main__":
-    inspect_func()
+    inspect_people()

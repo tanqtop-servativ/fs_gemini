@@ -15,9 +15,15 @@ export async function renderPeople(container) {
     container.innerHTML = `
       <div class="mb-6 flex justify-between items-center">
         <div><h1 class="text-2xl font-bold text-slate-900">People</h1><p class="text-gray-500">Tenant #${tenantId}</p></div>
-        <button id="btn-new-person" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-gray-800 transition">
-            <i data-lucide="plus" class="w-4 h-4 mr-2"></i> Add Person
-        </button>
+        <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" id="chk-show-deleted" class="rounded border-gray-300 text-black focus:ring-0">
+                Show Archived
+            </label>
+            <button id="btn-new-person" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-gray-800 transition">
+                <i data-lucide="plus" class="w-4 h-4 mr-2"></i> Add Person
+            </button>
+        </div>
       </div>
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <table class="w-full text-left border-collapse">
@@ -31,31 +37,49 @@ export async function renderPeople(container) {
       </div>`;
 
     document.getElementById('btn-new-person').onclick = () => openEditPersonModal(null);
-    await loadPeopleTable();
+    document.getElementById('chk-show-deleted').onchange = (e) => loadPeopleTable(e.target.checked);
+
+    await loadPeopleTable(false);
 }
 
-async function loadPeopleTable() {
-    const { data: people, error } = await supabase
+async function loadPeopleTable(showDeleted) {
+    let query = supabase
         .from('people_enriched')
         .select('*')
         .eq('tenant_id', getTenantId())
         .order('last_name');
 
+    if (!showDeleted) {
+        query = query.is('deleted_at', null);
+    } else {
+        // If showing deleted, maybe order by deleted_at? Or just keep name.
+        // Let's keep name for consistency.
+    }
+
+    const { data: people, error } = await query;
     const tbody = document.getElementById('people-body');
 
     if (error) return tbody.innerHTML = `<tr><td colspan="4" class="text-red-500 px-6 py-4">Error: ${error.message}</td></tr>`;
     if (!people || !people.length) return tbody.innerHTML = `<tr><td colspan="4" class="text-center px-6 py-8 text-gray-400">No people found.</td></tr>`;
 
-    tbody.innerHTML = people.map(p => `
-        <tr class="border-b border-gray-100 hover:bg-gray-50 group cursor-pointer" onclick="window.viewPerson('${p.id}')">
-            <td class="px-6 py-4 font-bold text-slate-900">${p.first_name} ${p.last_name || ''}</td>
+    tbody.innerHTML = people.map(p => {
+        const isDeleted = !!p.deleted_at;
+        const rowClass = isDeleted ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50';
+        const nameClass = isDeleted ? 'line-through text-gray-500' : 'text-slate-900';
+
+        return `
+        <tr class="border-b border-gray-100 ${rowClass} group cursor-pointer" onclick="window.viewPerson('${p.id}')">
+            <td class="px-6 py-4 font-bold ${nameClass}">
+                ${p.first_name} ${p.last_name || ''}
+                ${isDeleted ? '<span class="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded no-underline">ARCHIVED</span>' : ''}
+            </td>
             <td class="px-6 py-4">
                 ${p.roles_display ? `<span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded border border-gray-200">${p.roles_display}</span>` : '<span class="text-gray-300">-</span>'}
             </td>
             <td class="px-6 py-4 text-sm text-slate-600"><div class="flex items-center gap-1"><i data-lucide="mail" class="w-3 h-3"></i> ${p.email || '-'}</div></td>
             <td class="px-6 py-4 text-right"><button class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button></td>
         </tr>
-    `).join('');
+    `}).join('');
 
     window.viewPerson = (id) => openDetailPersonModal(id);
     lucide.createIcons();
@@ -66,6 +90,7 @@ async function openDetailPersonModal(id) {
     const { data: p, error } = await supabase.from('people_enriched').select('*').eq('id', id).single();
     if (error) return alert("Error: " + error.message);
 
+    const isDeleted = !!p.deleted_at;
     const container = document.getElementById('modal-container');
     container.innerHTML = `
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -74,8 +99,9 @@ async function openDetailPersonModal(id) {
                 <div class="flex items-center gap-4">
                     <div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-xl font-bold text-slate-500">${p.first_name[0]}${p.last_name ? p.last_name[0] : ''}</div>
                     <div>
-                        <h2 class="text-2xl font-bold text-slate-900">${p.first_name} ${p.last_name || ''}</h2>
+                        <h2 class="text-2xl font-bold text-slate-900 ${isDeleted ? 'line-through decoration-2 decoration-red-500' : ''}">${p.first_name} ${p.last_name || ''}</h2>
                         <p class="text-gray-500">${p.email || 'No email'}</p>
+                        ${isDeleted ? '<span class="text-xs font-bold text-red-500 uppercase">Archived</span>' : ''}
                     </div>
                 </div>
                 <button id="btn-close" class="text-gray-400 hover:text-black"><i data-lucide="x" class="w-6 h-6"></i></button>
@@ -89,19 +115,14 @@ async function openDetailPersonModal(id) {
 
             <!-- AUDIT HISTORY -->
             <div class="mt-6 border-t border-gray-100 pt-4">
-                <details class="group">
-                    <summary class="flex items-center gap-2 cursor-pointer text-xs font-bold uppercase text-gray-500 hover:text-slate-800 select-none">
-                        <i data-lucide="chevron-right" class="w-4 h-4 transition-transform group-open:rotate-90"></i>
-                        Audit History
-                    </summary>
-                    <div id="audit-log-container" class="mt-4 pl-2"></div>
-                </details>
+                <div id="audit-log-container"></div>
             </div>
 
              <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
-                <button id="btn-edit" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 flex items-center">
-                    <i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit
-                </button>
+                ${isDeleted
+            ? `<button onclick="window.restorePerson(${p.id})" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
+            : `<button id="btn-edit" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit</button>`
+        }
             </div>
         </div>
     </div>`;
@@ -109,16 +130,20 @@ async function openDetailPersonModal(id) {
     lucide.createIcons();
     renderAuditHistory('audit-log-container', 'people', id);
 
-    // Simple close for read-only
     const close = () => container.innerHTML = '';
     document.getElementById('btn-close').onclick = close;
     container.firstElementChild.addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
 
-    document.getElementById('btn-edit').onclick = () => openEditPersonModal(p);
+    if (!isDeleted) {
+        document.getElementById('btn-edit').onclick = () => openEditPersonModal(p);
+    }
 }
+
+// ... (Edit Modal remains mostly same, just update Delete button logic) ...
 
 // --- EDIT/CREATE MODAL ---
 async function openEditPersonModal(person) {
+    // ... (Same setup code as before) ...
     const tenantId = getTenantId();
     const container = document.getElementById('modal-container');
 
@@ -188,7 +213,7 @@ async function openEditPersonModal(person) {
                 ${userCreationHTML}
             </div>
             <div class="flex justify-between mt-6 gap-3">
-                 ${person ? `<button onclick="window.deletePerson(${person.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Delete</button>` : '<div></div>'}
+                 ${person ? `<button onclick="window.deletePerson(${person.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
                 <div class="flex gap-2">
                     <button id="btn-cancel" class="px-4 py-2 hover:bg-gray-100 rounded">Cancel</button>
                     <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">Save</button>
@@ -248,7 +273,7 @@ async function openEditPersonModal(person) {
 
             try {
                 // Call local API Server
-                const response = await fetch('http://localhost:3000/create-user', {
+                const response = await fetch('http://localhost:8080/create-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -280,11 +305,6 @@ async function openEditPersonModal(person) {
         const roleIds = Array.from(document.querySelectorAll('input[name="role_checkbox"]:checked'))
             .map(cb => parseInt(cb.value));
 
-        // We need to pass user_id to save_person_safe if we have it
-        // But save_person_safe might not accept p_user_id yet.
-        // Let's check if we need to update the RPC or just do a direct update.
-        // For now, let's assume we update the person record directly if we have a userId
-
         const { data: savedPerson, error } = await supabase.rpc('save_person_safe', {
             p_id: person ? person.id : null,
             p_tenant_id: tenantId,
@@ -299,12 +319,8 @@ async function openEditPersonModal(person) {
             btnSave.innerText = "Save";
             btnSave.disabled = false;
         } else {
-            // If we created a user, link it now (since save_person_safe might not handle it)
             if (userId) {
                 await supabase.from('people').update({ user_id: userId }).eq('id', savedPerson);
-
-                // Also create a Profile entry for them so they can log in!
-                // The API server creates the Auth User, but WE need to create the public.profile
                 await supabase.from('profiles').insert({
                     id: userId,
                     tenant_id: tenantId,
@@ -315,14 +331,36 @@ async function openEditPersonModal(person) {
             }
 
             container.innerHTML = '';
-            loadPeopleTable();
+            loadPeopleTable(document.getElementById('chk-show-deleted')?.checked);
         }
     };
 }
 
 window.deletePerson = async (id) => {
-    if (!confirm("Delete this person?")) return;
-    await supabase.from('people').delete().eq('id', id);
-    document.getElementById('modal-container').innerHTML = '';
-    loadPeopleTable();
+    if (!confirm("Archive this person?")) return;
+
+    // Soft Delete
+    const { error } = await supabase.from('people').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+
+    if (error) {
+        console.error(error);
+        alert("Error archiving person: " + error.message);
+    } else {
+        document.getElementById('modal-container').innerHTML = '';
+        loadPeopleTable(document.getElementById('chk-show-deleted')?.checked);
+    }
+};
+
+window.restorePerson = async (id) => {
+    if (!confirm("Restore this person?")) return;
+
+    const { error } = await supabase.from('people').update({ deleted_at: null }).eq('id', id);
+
+    if (error) {
+        console.error(error);
+        alert("Error restoring person: " + error.message);
+    } else {
+        document.getElementById('modal-container').innerHTML = '';
+        loadPeopleTable(document.getElementById('chk-show-deleted')?.checked);
+    }
 };
