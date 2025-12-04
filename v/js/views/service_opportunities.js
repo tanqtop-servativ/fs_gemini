@@ -332,19 +332,74 @@ async function openDetailModal(opp) {
         </div>
     </div>`;
 
-    // Fetch jobs for this opp
-    const { data: jobs } = await supabase.from('jobs').select('*').eq('service_opportunity_id', opp.id);
+    // Fetch jobs AND tasks for this opp
+    const { data: jobs } = await supabase
+        .from('jobs')
+        .select(`
+            *,
+            job_tasks (id, title, status),
+            job_inputs (
+                id, 
+                value, 
+                job_template_inputs (label, input_type)
+            )
+        `)
+        .eq('service_opportunity_id', opp.id)
+        .order('id', { ascending: true });
+
     const workflowContainer = document.getElementById('modal-workflow-status');
 
     if (jobs && jobs.length > 0) {
-        workflowContainer.innerHTML = `<div class="space-y-2">
-            ${jobs.map(j => `
-                <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-100">
-                    <span class="font-medium text-slate-700">${j.type}</span>
-                    <span class="text-xs px-2 py-1 rounded ${j.status === 'Complete' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${j.status}</span>
+        workflowContainer.innerHTML = `<div class="space-y-3">
+            ${jobs.map(j => {
+            // Sort tasks by ID for now (or order_index if we had it joined)
+            const tasks = j.job_tasks ? j.job_tasks.sort((a, b) => a.id - b.id) : [];
+
+            return `
+                <div class="bg-white p-3 rounded border border-gray-200">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-slate-700 text-sm">${j.type}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded ${j.status === 'Complete' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${j.status}</span>
+                    </div>
+                    
+                    ${tasks.length > 0 ? `
+                        <div class="space-y-1 pl-2 border-l-2 border-gray-100">
+                            ${tasks.map(t => `
+                                <div class="flex items-center gap-2 text-xs text-gray-600">
+                                    <i data-lucide="${t.status === 'Complete' ? 'check-square' : 'square'}" class="w-3 h-3 ${t.status === 'Complete' ? 'text-green-500' : 'text-gray-300'}"></i>
+                                    <span class="${t.status === 'Complete' ? 'line-through text-gray-400' : ''}">${t.title}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<div class="text-[10px] text-gray-400 italic pl-2">No tasks</div>'}
+
+                    ${j.job_inputs && j.job_inputs.length > 0 ? `
+                        <div class="mt-3 pt-2 border-t border-gray-50">
+                            <h5 class="text-[10px] font-bold text-gray-400 uppercase mb-1">Required Inputs</h5>
+                            <div class="space-y-2">
+                                ${j.job_inputs.map(i => {
+                const label = i.job_template_inputs ? i.job_template_inputs.label : 'Input';
+                const type = i.job_template_inputs ? i.job_template_inputs.input_type : 'text';
+                const value = i.value || '';
+
+                return `
+                                    <div class="flex flex-col gap-1">
+                                        <label class="text-xs text-gray-600 font-medium">${label}</label>
+                                        <input type="${type === 'photo' ? 'text' : type}" 
+                                            value="${value}" 
+                                            placeholder="${type === 'photo' ? 'Photo URL' : 'Enter value...'}"
+                                            class="w-full text-xs p-1.5 border border-gray-200 rounded bg-gray-50 focus:bg-white focus:border-blue-300 outline-none transition-colors"
+                                            disabled> <!-- Read-only for now -->
+                                    </div>`;
+            }).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
-            `).join('')}
+            `;
+        }).join('')}
         </div>`;
+        lucide.createIcons();
     } else {
         workflowContainer.innerHTML = '<p class="italic">No active workflow jobs.</p>';
     }

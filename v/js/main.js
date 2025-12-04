@@ -134,6 +134,15 @@ async function handleSession(session) {
         }
     }
 
+    // Fetch Tenant Name
+    const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('name')
+        .eq('id', window.currentUser.tenant_id)
+        .single();
+
+    window.currentUser.tenant_name = tenantData ? tenantData.name : 'Unknown Tenant';
+
     showAppShell();
 }
 
@@ -210,6 +219,19 @@ function showAppShell() {
         document.getElementById('header-user-name').innerText = window.currentUser.name;
         document.getElementById('header-user-role').innerText = window.currentUser.role;
         document.getElementById('header-user-avatar').src = window.currentUser.avatar;
+
+        // Tenant Name Display
+        const tenantEl = document.getElementById('header-tenant-name');
+        if (tenantEl) {
+            tenantEl.innerText = window.currentUser.tenant_name + (window.currentUser.is_impersonating ? ' (impersonating)' : '');
+            if (window.currentUser.is_impersonating) {
+                tenantEl.classList.remove('text-slate-700');
+                tenantEl.classList.add('text-red-600');
+            } else {
+                tenantEl.classList.remove('text-red-600');
+                tenantEl.classList.add('text-slate-700');
+            }
+        }
     }
 
     renderSidebar();

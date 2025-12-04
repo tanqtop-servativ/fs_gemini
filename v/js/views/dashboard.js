@@ -9,13 +9,15 @@ export async function renderDashboard(container) {
         </div>
       </div>
       
-      <div class="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-150px)]">
-        ${renderColumn('overdue', 'Overdue', 'bg-red-50 border-red-100 text-red-700')}
-        ${renderColumn('today', 'Today', 'bg-blue-50 border-blue-100 text-blue-700')}
-        ${renderColumn('tomorrow', 'Tomorrow', 'bg-green-50 border-green-100 text-green-700')}
-        ${renderColumn('this_week', 'This Week', 'bg-gray-50 border-gray-100 text-gray-700')}
-        ${renderColumn('next_week', 'Next Week', 'bg-gray-50 border-gray-100 text-gray-700')}
-        ${renderColumn('future', 'Future', 'bg-gray-50 border-gray-100 text-gray-700')}
+      <div class="w-full max-w-[calc(100vw-300px)] overflow-x-auto pb-4 h-[calc(100vh-150px)]">
+        <div class="flex gap-4 h-full w-max">
+            ${renderColumn('overdue', 'Overdue', 'bg-red-50 border-red-100 text-red-700')}
+            ${renderColumn('today', 'Today', 'bg-blue-50 border-blue-100 text-blue-700')}
+            ${renderColumn('tomorrow', 'Tomorrow', 'bg-green-50 border-green-100 text-green-700')}
+            ${renderColumn('this_week', 'This Week', 'bg-gray-50 border-gray-100 text-gray-700')}
+            ${renderColumn('next_week', 'Next Week', 'bg-gray-50 border-gray-100 text-gray-700')}
+            ${renderColumn('future', 'Future', 'bg-gray-50 border-gray-100 text-gray-700')}
+        </div>
       </div>`;
 
     await loadDashboard();
@@ -23,8 +25,8 @@ export async function renderDashboard(container) {
 
 function renderColumn(id, title, headerClass) {
     return `
-    <div class="flex-shrink-0 w-80 bg-slate-50 rounded-xl border border-gray-200 flex flex-col max-h-full">
-        <div class="p-3 border-b border-gray-200 ${headerClass} rounded-t-xl font-bold text-sm uppercase flex justify-between">
+    <div class="w-80 bg-slate-50 rounded-xl border border-gray-200 flex flex-col h-full flex-shrink-0">
+        <div class="p-3 border-b border-gray-200 ${headerClass} rounded-t-xl font-bold text-sm uppercase flex justify-between flex-shrink-0">
             ${title}
             <span id="count-${id}" class="bg-white/50 px-2 rounded text-xs flex items-center">0</span>
         </div>
@@ -37,7 +39,7 @@ function renderColumn(id, title, headerClass) {
 
 async function loadDashboard() {
     const { data: jobs, error } = await supabase.rpc('get_dashboard_horizon', {
-        p_tenant_id: 1 // TODO: Get from user context
+        p_tenant_id: window.currentUser.tenant_id
     });
 
     if (error) return alert("Error loading dashboard: " + error.message);
