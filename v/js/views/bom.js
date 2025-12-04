@@ -3,7 +3,7 @@ import { setupModalGuard } from '../modal_utils.js';
 
 // --- STATE ---
 let currentItems = [];
-let currentTemplateId = null; 
+let currentTemplateId = null;
 
 // --- HELPERS ---
 function getTenantId() {
@@ -21,9 +21,15 @@ export async function renderBOM(container) {
             <h1 class="text-2xl font-bold text-slate-900">BOM Templates</h1>
             <p class="text-gray-500">Standardize inventory kits (Tenant #${tenantId})</p>
         </div>
-        <button id="btn-new-bom" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-gray-800 transition">
-            <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Template
-        </button>
+        <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" id="chk-show-archived" class="rounded border-gray-300 text-black focus:ring-0">
+                Show Archived
+            </label>
+            <button id="btn-new-bom" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-gray-800 transition">
+                <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Template
+            </button>
+        </div>
       </div>
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <table class="w-full text-left border-collapse">
@@ -39,30 +45,45 @@ export async function renderBOM(container) {
       </div>`;
 
     document.getElementById('btn-new-bom').onclick = () => openEditBOMModal(null);
+    document.getElementById('chk-show-archived').onchange = (e) => loadBOMTable(tenantId, e.target.checked);
     await loadBOMTable(tenantId);
 }
 
-async function loadBOMTable(tenantId) {
-    const { data: templates, error } = await supabase
+async function loadBOMTable(tenantId, showArchived = false) {
+    let query = supabase
         .from('bom_templates')
         .select('*')
         .eq('tenant_id', tenantId)
         .order('name');
 
+    if (!showArchived) {
+        query = query.is('deleted_at', null);
+    }
+
+    const { data: templates, error } = await query;
     const tbody = document.getElementById('bom-body');
 
     if (error) return tbody.innerHTML = `<tr><td colspan="3" class="text-red-500 px-6 py-4">Error: ${error.message}</td></tr>`;
-    if (templates.length === 0) return tbody.innerHTML = `<tr><td colspan="3" class="text-center px-6 py-8 text-gray-400">No templates found.</td></tr>`;
+    if (!templates || templates.length === 0) return tbody.innerHTML = `<tr><td colspan="3" class="text-center px-6 py-8 text-gray-400">No templates found.</td></tr>`;
 
-    tbody.innerHTML = templates.map(t => `
-        <tr class="border-b border-gray-100 hover:bg-gray-50 group cursor-pointer" onclick="window.viewBOM('${t.id}')">
-            <td class="px-6 py-4 font-bold text-slate-900">${t.name}</td>
+    tbody.innerHTML = templates.map(t => {
+        const isDeleted = !!t.deleted_at;
+        const rowClass = isDeleted ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50';
+        const nameClass = isDeleted ? 'line-through text-gray-500' : 'text-slate-900';
+
+        return `
+        <tr class="border-b border-gray-100 ${rowClass} group cursor-pointer" onclick="window.viewBOM('${t.id}')">
+            <td class="px-6 py-4 font-bold ${nameClass}">
+                ${t.name}
+                ${isDeleted ? '<span class="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded no-underline">ARCHIVED</span>' : ''}
+            </td>
             <td class="px-6 py-4 text-gray-500">${t.description || '-'}</td>
             <td class="px-6 py-4 text-right">
                 <button class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
             </td>
-        </tr>`).join('');
-    
+        </tr>`
+    }).join('');
+
     window.viewBOM = (id) => openDetailBOMModal(id);
     lucide.createIcons();
 }
@@ -73,7 +94,8 @@ async function openDetailBOMModal(id) {
     const { data: tmpl } = await supabase.from('bom_templates').select('*').eq('id', id).single();
     const { data: items } = await supabase.from('bom_template_items').select('*').eq('template_id', id).order('sort_order');
 
-    const itemsHtml = items && items.length 
+    const isDeleted = !!tmpl.deleted_at;
+    const itemsHtml = items && items.length
         ? items.map(i => `<div class="flex justify-between items-center border-b border-gray-50 py-2"><div class="flex gap-3 items-center"><span class="bg-slate-100 px-2 rounded text-sm font-bold text-slate-700">${i.quantity}x</span> <span class="font-medium">${i.item_name}</span></div><span class="text-xs text-gray-400">${i.category}</span></div>`).join('')
         : '<div class="text-center py-4 text-gray-400">No items in this template.</div>';
 
@@ -81,27 +103,34 @@ async function openDetailBOMModal(id) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-8 h-[80vh] flex flex-col">
             <div class="flex justify-between items-start mb-4">
-                <div><h2 class="text-2xl font-bold text-slate-900">${tmpl.name}</h2><p class="text-gray-500">${tmpl.description || ''}</p></div>
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 ${isDeleted ? 'line-through decoration-red-500' : ''}">${tmpl.name}</h2>
+                    <p class="text-gray-500">${tmpl.description || ''}</p>
+                    ${isDeleted ? '<span class="text-xs font-bold text-red-500 uppercase">Archived</span>' : ''}
+                </div>
                 <button id="btn-close-view" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
             </div>
             <div class="flex-1 overflow-y-auto border-t border-gray-100 pt-4">
                 ${itemsHtml}
             </div>
             <div class="mt-6 pt-4 border-t border-gray-100 flex justify-end gap-3">
-                <button id="btn-edit-bom" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 flex items-center">
-                    <i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit Template
-                </button>
+                ${isDeleted
+            ? `<button onclick="window.restoreBOM(${tmpl.id})" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
+            : `<button id="btn-edit-bom" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit Template</button>`
+        }
             </div>
         </div>
     </div>`;
-    
+
     lucide.createIcons();
-    
+
     const close = () => container.innerHTML = '';
     document.getElementById('btn-close-view').onclick = close;
-    container.firstElementChild.addEventListener('click', (e) => { if(e.target === e.currentTarget) close(); });
+    container.firstElementChild.addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
 
-    document.getElementById('btn-edit-bom').onclick = () => openEditBOMModal(tmpl);
+    if (!isDeleted) {
+        document.getElementById('btn-edit-bom').onclick = () => openEditBOMModal(tmpl);
+    }
 }
 
 // --- EDIT MODAL ---
@@ -139,7 +168,7 @@ async function openEditBOMModal(template) {
                 <div id="bom-items-list" class="flex-1 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50 space-y-1"></div>
             </div>
             <div class="flex justify-between mt-4 gap-3">
-                ${template ? `<button onclick="window.deleteBOM(${template.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Delete</button>` : '<div></div>'}
+                ${template ? `<button onclick="window.deleteBOM(${template.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
                 <div class="flex gap-2">
                     <button id="btn-cancel" class="px-4 py-2">Cancel</button>
                     <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">Save</button>
@@ -155,27 +184,27 @@ async function openEditBOMModal(template) {
             .select('*')
             .eq('template_id', template.id)
             .order('sort_order', { ascending: true });
-        
+
         if (items) currentItems = items.map(i => ({ name: i.item_name, qty: i.quantity, category: i.category, notes: i.notes || '' }));
     }
     renderItemsList();
 
     // INIT SORTABLE
     const listEl = document.getElementById('bom-items-list');
-    if(Sortable) Sortable.create(listEl, { animation: 150, handle: '.drag-handle', ghostClass: 'bg-blue-50' });
+    if (Sortable) Sortable.create(listEl, { animation: 150, handle: '.drag-handle', ghostClass: 'bg-blue-50' });
 
     // GUARD
     const safeClose = setupModalGuard('modal-container', () => { container.innerHTML = ''; });
     document.getElementById('btn-cancel').onclick = safeClose;
 
     document.getElementById('btn-add-item').onclick = handleAddItem;
-    document.getElementById('new-item-name').addEventListener('keypress', (e) => { if(e.key === 'Enter') handleAddItem(); });
-    
+    document.getElementById('new-item-name').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleAddItem(); });
+
     document.getElementById('btn-save').onclick = async () => {
         // SYNC ORDER
         const newOrder = [];
         listEl.querySelectorAll('.bom-item').forEach((el) => { newOrder.push(currentItems[parseInt(el.dataset.originalIdx)]); });
-        if(newOrder.length > 0) currentItems = newOrder;
+        if (newOrder.length > 0) currentItems = newOrder;
 
         const name = document.getElementById('inp-bom-name').value;
         if (!name) return alert("Name required");
@@ -194,7 +223,7 @@ async function openEditBOMModal(template) {
         if (error) alert("Error: " + error.message);
         else {
             document.getElementById('modal-container').innerHTML = '';
-            loadBOMTable(tenantId);
+            loadBOMTable(tenantId, document.getElementById('chk-show-archived')?.checked);
         }
     };
     lucide.createIcons();
@@ -205,16 +234,16 @@ function handleAddItem() {
     const qtyIn = document.getElementById('new-item-qty');
     const catIn = document.getElementById('new-item-cat');
     if (!nameIn.value.trim()) return;
-    
+
     // FIXED: Default to 0 if empty
     const qty = parseInt(qtyIn.value);
-    currentItems.push({ 
-        name: nameIn.value.trim(), 
-        qty: isNaN(qty) ? 0 : qty, 
-        category: catIn.value, 
-        notes: '' 
+    currentItems.push({
+        name: nameIn.value.trim(),
+        qty: isNaN(qty) ? 0 : qty,
+        category: catIn.value,
+        notes: ''
     });
-    
+
     nameIn.value = ''; qtyIn.value = '0'; nameIn.focus();
     renderItemsList();
 }
@@ -233,7 +262,7 @@ function renderItemsList() {
             </div>
             <button onclick="window.removeBOMItem(${idx})" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="x" class="w-3 h-3"></i></button>
         </div>`).join('') : '<div class="text-center text-gray-400 py-4 text-sm">No items. Add some above.</div>';
-    
+
     // BIND CHANGE EVENTS
     list.querySelectorAll('.item-qty-edit').forEach(input => {
         input.addEventListener('change', (e) => {
@@ -246,4 +275,19 @@ function renderItemsList() {
 }
 
 window.removeBOMItem = (idx) => { currentItems.splice(idx, 1); renderItemsList(); };
-window.deleteBOM = async (id) => { if(confirm("Delete?")) { await supabase.from('bom_templates').delete().eq('id', id); document.getElementById('modal-container').innerHTML = ''; loadBOMTable(getTenantId()); } };
+
+window.deleteBOM = async (id) => {
+    if (confirm("Archive this template?")) {
+        await supabase.from('bom_templates').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+        document.getElementById('modal-container').innerHTML = '';
+        loadBOMTable(getTenantId(), document.getElementById('chk-show-archived')?.checked);
+    }
+};
+
+window.restoreBOM = async (id) => {
+    if (confirm("Restore this template?")) {
+        await supabase.from('bom_templates').update({ deleted_at: null }).eq('id', id);
+        document.getElementById('modal-container').innerHTML = '';
+        loadBOMTable(getTenantId(), document.getElementById('chk-show-archived')?.checked);
+    }
+};

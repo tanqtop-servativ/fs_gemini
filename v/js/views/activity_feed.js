@@ -287,6 +287,7 @@ function openDetailModal(item) {
                  <div class="grid grid-cols-2 gap-4 text-sm">
                     <div><span class="font-bold text-gray-500">Table:</span> ${item.details.table}</div>
                     <div><span class="font-bold text-gray-500">Operation:</span> ${item.details.operation}</div>
+                    ${item.details.record_summary ? `<div class="col-span-2"><span class="font-bold text-gray-500">Record:</span> <span class="font-bold text-slate-900">${item.details.record_summary}</span></div>` : ''}
                 </div>
                 <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Changes</h4>

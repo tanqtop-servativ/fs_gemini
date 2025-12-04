@@ -130,7 +130,10 @@ export async function renderAuditHistory(containerId, tableName, recordId) {
                     </div>
                     ${userDisplay}
                 </div>
-                <div class="text-sm text-slate-700">${log.description}</div>
+                <div class="text-sm text-slate-700">
+                    ${log.record_summary ? `<span class="font-bold text-slate-900">${log.record_summary}</span> - ` : ''}
+                    ${log.description}
+                </div>
                 ${diffHtml}
             </div>
         </div>`;

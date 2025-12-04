@@ -6,27 +6,39 @@ export async function renderJobTemplates(container) {
     let templates = [];
 
     // --- FETCH ---
-    const fetchTemplates = async () => {
-        const { data, error } = await supabase
+    const fetchTemplates = async (showArchived = false) => {
+        let query = supabase
             .from('job_templates')
             .select('*, job_template_tasks(*)')
             .eq('tenant_id', tenantId)
             .order('name');
 
+        if (!showArchived) {
+            query = query.is('deleted_at', null);
+        }
+
+        const { data, error } = await query;
+
         if (error) return alert("Error fetching templates: " + error.message);
         templates = data;
-        renderList();
+        renderList(showArchived);
     };
 
     // --- RENDER LIST ---
-    const renderList = () => {
+    const renderList = (showArchived) => {
         container.innerHTML = `
             <div class="p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h1 class="text-2xl font-bold text-slate-800">Job Templates</h1>
-                    <button id="btn-new-tmpl" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 flex items-center shadow-lg hover:shadow-xl transition-all">
-                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Template
-                    </button>
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                            <input type="checkbox" id="chk-show-archived" class="rounded border-gray-300 text-black focus:ring-0" ${showArchived ? 'checked' : ''}>
+                            Show Archived
+                        </label>
+                        <button id="btn-new-tmpl" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 flex items-center shadow-lg hover:shadow-xl transition-all">
+                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Template
+                        </button>
+                    </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tmpl-grid"></div>
             </div>
@@ -38,16 +50,20 @@ export async function renderJobTemplates(container) {
             grid.innerHTML = `<div class="col-span-full text-center text-gray-400 py-10">No templates found. Create one to get started.</div>`;
         } else {
             templates.forEach(t => {
+                const isDeleted = !!t.deleted_at;
                 const card = document.createElement('div');
-                card.className = "bg-white rounded-xl shadow-sm border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer group relative";
+                card.className = `bg-white rounded-xl shadow-sm border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer group relative ${isDeleted ? 'opacity-60 bg-gray-50' : ''}`;
                 card.onclick = () => openModal(t);
 
                 const taskCount = t.job_template_tasks ? t.job_template_tasks.length : 0;
 
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-2">
-                        <h3 class="font-bold text-lg text-slate-800">${t.name}</h3>
-                        <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full font-bold">${taskCount} Tasks</span>
+                        <h3 class="font-bold text-lg text-slate-800 ${isDeleted ? 'line-through decoration-slate-400' : ''}">${t.name}</h3>
+                        <div class="flex gap-2">
+                            ${isDeleted ? '<span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full font-bold uppercase">Archived</span>' : ''}
+                            <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full font-bold">${taskCount} Tasks</span>
+                        </div>
                     </div>
                     <p class="text-sm text-gray-500 line-clamp-2 mb-4 h-10">${t.description || 'No description'}</p>
                     <div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -59,12 +75,14 @@ export async function renderJobTemplates(container) {
         }
 
         document.getElementById('btn-new-tmpl').onclick = () => openModal(null);
+        document.getElementById('chk-show-archived').onchange = (e) => fetchTemplates(e.target.checked);
         lucide.createIcons();
     };
 
     // --- MODAL ---
     const openModal = (tmpl) => {
         const isEdit = !!tmpl;
+        const isDeleted = tmpl && !!tmpl.deleted_at;
         let tasks = tmpl ? (tmpl.job_template_tasks || []).sort((a, b) => a.sort_order - b.sort_order) : [];
 
         const modal = document.getElementById('modal-container');
@@ -162,7 +180,10 @@ export async function renderJobTemplates(container) {
                     </div>
 
                     <div class="p-4 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-between">
-                        ${isEdit ? `<button id="btn-delete" class="text-red-500 hover:text-red-700 text-sm font-bold px-2">Delete Template</button>` : '<div></div>'}
+                        ${isEdit ? (isDeleted
+                ? `<button id="btn-restore" class="text-green-600 hover:text-green-800 text-sm font-bold px-2 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore Template</button>`
+                : `<button id="btn-delete" class="text-red-500 hover:text-red-700 text-sm font-bold px-2">Archive Template</button>`)
+                : '<div></div>'}
                         <div class="flex gap-2">
                             <button id="btn-cancel" class="px-4 py-2 text-sm hover:bg-gray-200 rounded text-gray-600">Cancel</button>
                             <button id="btn-save" class="bg-black text-white px-6 py-2 rounded text-sm font-bold hover:bg-gray-800">Save Template</button>
@@ -184,12 +205,21 @@ export async function renderJobTemplates(container) {
         };
 
         if (isEdit) {
-            document.getElementById('btn-delete').onclick = async () => {
-                if (!confirm("Are you sure? This cannot be undone.")) return;
-                const { error } = await supabase.from('job_templates').delete().eq('id', tmpl.id);
-                if (error) alert(error.message);
-                else { modal.innerHTML = ''; fetchTemplates(); }
-            };
+            if (isDeleted) {
+                document.getElementById('btn-restore').onclick = async () => {
+                    if (!confirm("Restore this template?")) return;
+                    const { error } = await supabase.from('job_templates').update({ deleted_at: null }).eq('id', tmpl.id);
+                    if (error) alert(error.message);
+                    else { modal.innerHTML = ''; fetchTemplates(document.getElementById('chk-show-archived')?.checked); }
+                };
+            } else {
+                document.getElementById('btn-delete').onclick = async () => {
+                    if (!confirm("Archive this template?")) return;
+                    const { error } = await supabase.from('job_templates').update({ deleted_at: new Date().toISOString() }).eq('id', tmpl.id);
+                    if (error) alert(error.message);
+                    else { modal.innerHTML = ''; fetchTemplates(document.getElementById('chk-show-archived')?.checked); }
+                };
+            }
         }
 
         document.getElementById('btn-save').onclick = async () => {
@@ -224,7 +254,7 @@ export async function renderJobTemplates(container) {
             if (err) alert("Error: " + err.message);
             else {
                 modal.innerHTML = '';
-                fetchTemplates();
+                fetchTemplates(document.getElementById('chk-show-archived')?.checked);
             }
         };
 

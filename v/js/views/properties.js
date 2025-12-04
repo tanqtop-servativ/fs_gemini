@@ -10,9 +10,15 @@ export async function renderProperties(container) {
     container.innerHTML = `
       <div class="mb-6 flex justify-between items-center">
         <div><h1 class="text-2xl font-bold text-slate-900">Properties</h1><p class="text-gray-500">Manage units & assignments</p></div>
-        <button id="btn-new-prop" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-gray-800 transition">
-            <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Property
-        </button>
+        <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" id="chk-show-archived" class="rounded border-gray-300 text-black focus:ring-0">
+                Show Archived
+            </label>
+            <button id="btn-new-prop" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-gray-800 transition">
+                <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Property
+            </button>
+        </div>
       </div>
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <table class="w-full text-left border-collapse">
@@ -29,11 +35,18 @@ export async function renderProperties(container) {
       </div>`;
 
     document.getElementById('btn-new-prop').onclick = () => openEditModal(null);
+    document.getElementById('chk-show-archived').onchange = (e) => loadTableData(e.target.checked);
     await loadTableData();
 }
 
-async function loadTableData() {
-    let query = supabase.from('properties_enriched').select('*').eq('status', 'active');
+async function loadTableData(showArchived = false) {
+    let query = supabase.from('properties_enriched').select('*');
+
+    if (showArchived) {
+        query = query.eq('status', 'archived');
+    } else {
+        query = query.eq('status', 'active');
+    }
 
     // Filter by tenant_id if available (for impersonation or strict scoping)
     if (window.currentUser && window.currentUser.tenant_id) {
@@ -46,15 +59,17 @@ async function loadTableData() {
     if (!props || !props.length) return tbody.innerHTML = `<tr><td colspan="4" class="text-center px-6 py-8 text-gray-400">No properties found.</td></tr>`;
 
     tbody.innerHTML = props.map(p => {
+        const isArchived = p.status === 'archived';
         const thumb = p.front_photo_url
-            ? `<img src="${p.front_photo_url}" class="w-10 h-10 rounded object-cover border border-gray-200">`
+            ? `<img src="${p.front_photo_url}" class="w-10 h-10 rounded object-cover border border-gray-200 ${isArchived ? 'grayscale' : ''}">`
             : `<div class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-400"><i data-lucide="home" class="w-5 h-5"></i></div>`;
 
-        return `<tr class="border-b border-gray-100 hover:bg-gray-50 group cursor-pointer" onclick="window.viewProp('${p.id}')">
+        return `<tr class="border-b border-gray-100 ${isArchived ? 'bg-gray-50 opacity-75' : 'hover:bg-gray-50'} group cursor-pointer" onclick="window.viewProp('${p.id}')">
             <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
                     ${thumb}
-                    <span class="font-bold text-slate-900">${p.name}</span>
+                    <span class="font-bold ${isArchived ? 'text-gray-500 line-through' : 'text-slate-900'}">${p.name}</span>
+                    ${isArchived ? '<span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase no-underline">Archived</span>' : ''}
                 </div>
             </td>
             <td class="px-6 py-4 text-sm text-gray-600 max-w-xs">${renderAddressWithLink(p.display_address)}</td>
@@ -323,10 +338,10 @@ async function openEditModal(prop) {
         if (resInv.data) inventory = resInv.data.map(i => ({ name: i.item_name, qty: i.quantity, category: i.category }));
 
         // Sort by Order
-        const resPhotos = await supabase.from('property_reference_photos').select('*').eq('property_id', prop.id).order('sort_order');
+        const resPhotos = await supabase.from('property_reference_photos').select('*').eq('property_id', prop.id).is('deleted_at', null).order('sort_order');
         if (resPhotos.data) refPhotos = resPhotos.data;
 
-        const resAtt = await supabase.from('property_attachments').select('*').eq('property_id', prop.id).order('created_at', { ascending: false });
+        const resAtt = await supabase.from('property_attachments').select('*').eq('property_id', prop.id).is('deleted_at', null).order('created_at', { ascending: false });
         if (resAtt.data) attachments = resAtt.data;
     }
 
@@ -368,8 +383,11 @@ async function openEditModal(prop) {
         ? `<img src="${valPhoto}" class="w-full h-32 object-cover rounded-lg border border-gray-200 mb-2">`
         : `<div class="w-full h-32 bg-slate-50 rounded-lg border border-dashed border-slate-300 flex items-center justify-center text-slate-400 mb-2"><span class="text-xs">No Photo</span></div>`;
 
+    const isArchived = prop && prop.status === 'archived';
     const deleteBtn = prop
-        ? `<button onclick="window.deleteProperty(${prop.id})" class="text-red-500 hover:text-red-700 font-bold text-sm px-2">Delete</button>`
+        ? (isArchived
+            ? `<button onclick="window.restoreProperty(${prop.id})" class="text-green-600 hover:text-green-800 font-bold text-sm px-2 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore Property</button>`
+            : `<button onclick="window.deleteProperty(${prop.id})" class="text-red-500 hover:text-red-700 font-bold text-sm px-2">Archive Property</button>`)
         : '<div></div>';
 
     let tmplOpts = '<option value="">Apply Template...</option>';
@@ -451,7 +469,10 @@ async function openEditModal(prop) {
 
             <!-- RIGHT -->
             <div class="w-full md:w-2/3 space-y-4">
-                <h3 class="font-bold text-lg mb-4 text-slate-900">${title}</h3>
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-slate-900 ${isArchived ? 'line-through decoration-red-500' : ''}">${title}</h3>
+                    ${isArchived ? '<span class="bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold uppercase">Archived</span>' : ''}
+                </div>
                 
                 <input id="inp-name" class="w-full border p-2 rounded" placeholder="Property Name" value="${valName}">
                 
@@ -588,7 +609,7 @@ async function openEditModal(prop) {
     });
     window.deleteAttachment = async (id) => {
         if (!confirm("Remove attachment?")) return;
-        await supabase.from('property_attachments').delete().eq('id', id);
+        await supabase.from('property_attachments').update({ deleted_at: new Date().toISOString() }).eq('id', id);
         attachments = attachments.filter(a => a.id !== id);
         renderAttachments();
     };
@@ -687,7 +708,7 @@ async function openEditModal(prop) {
     };
     window.deleteRefPhoto = async (id) => {
         if (!confirm("Remove photo?")) return;
-        await supabase.from('property_reference_photos').delete().eq('id', id);
+        await supabase.from('property_reference_photos').update({ deleted_at: new Date().toISOString() }).eq('id', id);
         refPhotos = refPhotos.filter(p => p.id !== id);
         renderRefPhotos();
     };
@@ -903,8 +924,18 @@ async function openEditModal(prop) {
 }
 
 window.deleteProperty = async (id) => {
-    if (prompt("Type DELETE to confirm:") !== 'DELETE') return;
+    if (prompt("Type ARCHIVE to confirm:") !== 'ARCHIVE') return;
     await supabase.rpc('delete_property_safe', { p_id: id });
     document.getElementById('modal-container').innerHTML = '';
-    loadTableData();
+    loadTableData(document.getElementById('chk-show-archived')?.checked);
+};
+
+window.restoreProperty = async (id) => {
+    if (!confirm("Restore this property?")) return;
+    const { error } = await supabase.from('properties').update({ status: 'active' }).eq('id', id);
+    if (error) alert("Error: " + error.message);
+    else {
+        document.getElementById('modal-container').innerHTML = '';
+        loadTableData(document.getElementById('chk-show-archived')?.checked);
+    }
 };
