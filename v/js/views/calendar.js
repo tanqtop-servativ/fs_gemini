@@ -7,10 +7,14 @@ export function renderCalendar(container) {
         <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
           <div><h1 class="text-2xl font-bold text-slate-900">Master Calendar</h1></div>
           <div class="flex gap-2">
-            <select id="propertySelector" class="border border-gray-300 rounded-lg p-2 text-sm bg-white min-w-[200px]"></select>
+            <select id="propertySelector" class="border border-gray-300 rounded-lg p-2 text-sm bg-white min-w-[200px]">
+                <option value="all">All Properties</option>
+            </select>
             <select id="viewSelector" class="border border-gray-300 rounded-lg p-2 text-sm bg-white font-medium">
-              <option value="dayGridMonth" selected>Month</option>
+              <option value="dayGridMonth">Month</option>
               <option value="timeGridWeek">Week</option>
+              <option value="timeGridDay" selected>Day (Timeline)</option>
+              <option value="listWeek">List</option>
             </select>
           </div>
         </div>
@@ -54,17 +58,36 @@ async function initCalendarLogic() {
     }
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
+        initialView: 'timeGridDay', // Default to Day view as requested
         headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
         height: '100%',
         allDaySlot: true,
+        slotMinTime: '06:00:00',
+        slotMaxTime: '22:00:00',
         events: [],
+        eventContent: function (arg) {
+            // Custom render to match screenshot
+            const props = arg.event.extendedProps;
+            const timeText = arg.timeText;
+
+            // If it's a small slot, show minimal info
+            return {
+                html: `
+                <div class="p-1 overflow-hidden h-full flex flex-col justify-center leading-tight">
+                    <div class="font-bold text-xs truncate">${arg.event.title}</div>
+                    ${props.property_name ? `<div class="text-[10px] truncate opacity-90">${props.property_name}</div>` : ''}
+                    ${props.property_address ? `<div class="text-[9px] truncate opacity-75">${props.property_address}</div>` : ''}
+                </div>`
+            };
+        },
         eventDidMount: function (info) {
             const props = info.event.extendedProps;
             if (tippy) {
                 tippy(info.el, {
                     content: `<div style="text-align:left;">
                         <strong style="font-size:1.1em;">${info.event.title}</strong><br>
+                        <span style="color:#666; font-size:0.9em;">${props.property_name || ''}</span><br>
+                        <span style="color:#888; font-size:0.8em;">${props.property_address || ''}</span><br>
                         <span style="color:#666; font-size:0.9em;">${props.code || ''}</span>
                     </div>`,
                     allowHTML: true, theme: 'light-border'
@@ -76,7 +99,13 @@ async function initCalendarLogic() {
 
     // 3. Fetch Data Function
     const loadCalData = async (propId) => {
-        const { data: events, error } = await supabase.from('master_calendar').select('*').eq('property_id', propId);
+        let query = supabase.from('master_calendar').select('*');
+
+        if (propId !== 'all') {
+            query = query.eq('property_id', propId);
+        }
+
+        const { data: events, error } = await query;
         if (error) { console.error(error); return; }
 
         const fcEvents = events.map(evt => ({
@@ -87,7 +116,12 @@ async function initCalendarLogic() {
             color: evt.color,
             classNames: [evt.class_name],
             allDay: evt.all_day,
-            extendedProps: { description: evt.description, code: evt.code }
+            extendedProps: {
+                description: evt.description,
+                code: evt.code,
+                property_name: evt.property_name,
+                property_address: evt.property_address
+            }
         }));
 
         calendar.removeAllEvents();

@@ -15,7 +15,7 @@ import { renderActivityFeed } from './views/activity_feed.js';
 window.currentUser = null;
 
 const MENU_ITEMS = [
-    { id: 'dashboard', label: 'Live Status', icon: 'activity' },
+    { id: 'dashboard', label: 'Horizon Board', icon: 'trello' },
     { id: 'activity', label: 'Activity Feed', icon: 'list' }, // New Item
     { id: 'service_opportunities', label: 'Service Ops', icon: 'git-branch' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },

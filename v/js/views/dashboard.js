@@ -1,96 +1,105 @@
 import { supabase } from '../supabase.js';
-import { renderAddressWithLink } from '../utils.js';
 
 export async function renderDashboard(container) {
-    // 1. Render Skeleton IMMEDIATELY
     container.innerHTML = `
-      <div class="mb-6"><h1 class="text-2xl font-bold text-slate-900">Live Status</h1><p class="text-gray-500">Real-time property overview</p></div>
-      <div id="live-grid-content" class="min-h-[200px]">
-        <div class="text-gray-400 flex items-center gap-2"><i data-lucide="loader-2" class="animate-spin"></i> Loading status...</div>
+      <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Horizon Board</h1>
+            <p class="text-gray-500">Overview of upcoming work.</p>
+        </div>
+      </div>
+      
+      <div class="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-150px)]">
+        ${renderColumn('overdue', 'Overdue', 'bg-red-50 border-red-100 text-red-700')}
+        ${renderColumn('today', 'Today', 'bg-blue-50 border-blue-100 text-blue-700')}
+        ${renderColumn('tomorrow', 'Tomorrow', 'bg-green-50 border-green-100 text-green-700')}
+        ${renderColumn('this_week', 'This Week', 'bg-gray-50 border-gray-100 text-gray-700')}
+        ${renderColumn('next_week', 'Next Week', 'bg-gray-50 border-gray-100 text-gray-700')}
+        ${renderColumn('future', 'Future', 'bg-gray-50 border-gray-100 text-gray-700')}
       </div>`;
-    lucide.createIcons();
 
-    // 2. Fetch Data
-    const { data: props, error } = await supabase
-        .from('properties_enriched')
-        .select('*, bookings(start_date, end_date)')
-        .eq('status', 'active')
-        .order('name');
+    await loadDashboard();
+}
 
-    const contentDiv = document.getElementById('live-grid-content');
-    if (!contentDiv) return; // User navigated away
+function renderColumn(id, title, headerClass) {
+    return `
+    <div class="flex-shrink-0 w-80 bg-slate-50 rounded-xl border border-gray-200 flex flex-col max-h-full">
+        <div class="p-3 border-b border-gray-200 ${headerClass} rounded-t-xl font-bold text-sm uppercase flex justify-between">
+            ${title}
+            <span id="count-${id}" class="bg-white/50 px-2 rounded text-xs flex items-center">0</span>
+        </div>
+        <div id="col-${id}" class="p-3 space-y-3 overflow-y-auto flex-1 min-h-0">
+            <!-- Cards go here -->
+            <div class="text-center text-gray-400 text-xs py-4">Loading...</div>
+        </div>
+    </div>`;
+}
 
-    if (error) {
-        contentDiv.innerHTML = `<div class="text-red-500 p-4 border border-red-200 rounded bg-red-50">Error: ${error.message}</div>`;
-        return;
-    }
+async function loadDashboard() {
+    const { data: jobs, error } = await supabase.rpc('get_dashboard_horizon', {
+        p_tenant_id: 1 // TODO: Get from user context
+    });
 
-    if (!props || props.length === 0) {
-        contentDiv.innerHTML = '<div class="text-center text-gray-400 py-10">No active properties found.</div>';
-        return;
-    }
+    if (error) return alert("Error loading dashboard: " + error.message);
 
-    // 3. Build Grid
-    let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">';
-    const today = new Date();
+    // Clear columns
+    ['overdue', 'today', 'tomorrow', 'this_week', 'next_week', 'future'].forEach(id => {
+        document.getElementById(`col-${id}`).innerHTML = '';
+        document.getElementById(`count-${id}`).innerText = '0';
+    });
 
-    props.forEach(p => {
-        let status = { label: 'Ready', color: 'green', icon: 'check-circle', desc: 'Unit is standing by' };
-        let nextGuest = null;
+    if (!jobs || jobs.length === 0) return;
 
-        if (p.bookings && p.bookings.length > 0) {
-            p.bookings.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-            for (const b of p.bookings) {
-                const start = new Date(b.start_date);
-                const end = new Date(b.end_date);
-                if (today >= start && today <= end) {
-                    status = { label: 'Occupied', color: 'blue', icon: 'user', desc: 'Guest currently in unit' };
-                    break;
-                }
-                if (end.toDateString() === today.toDateString()) {
-                    status = { label: 'Dirty', color: 'red', icon: 'trash-2', desc: 'Guest checkout today' };
-                    break;
-                }
-                if (start > today) {
-                    nextGuest = start;
-                    break;
-                }
-            }
+    // Bucketize
+    const buckets = {
+        overdue: [], today: [], tomorrow: [], this_week: [], next_week: [], future: []
+    };
+
+    jobs.forEach(job => {
+        if (buckets[job.bucket]) buckets[job.bucket].push(job);
+    });
+
+    // Render
+    Object.keys(buckets).forEach(key => {
+        const container = document.getElementById(`col-${key}`);
+        document.getElementById(`count-${key}`).innerText = buckets[key].length;
+
+        if (buckets[key].length === 0) {
+            container.innerHTML = `<div class="text-center text-gray-300 text-xs py-8">No jobs</div>`;
+            return;
         }
 
-        const badgeClass = `bg-${status.color}-100 text-${status.color}-800`;
-        const actionButton = status.label === 'Dirty'
-            ? `<button class="mt-4 w-full bg-slate-900 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-700 transition">Create Job</button>`
-            : '';
-
-        const thumb = p.front_photo_url
-            ? `<img src="${p.front_photo_url}" class="w-full h-32 object-cover rounded-t-xl mb-4">`
-            : `<div class="w-full h-32 bg-slate-100 flex items-center justify-center text-slate-400 rounded-t-xl mb-4"><i data-lucide="image" class="w-8 h-8"></i></div>`;
-
-        html += `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden flex flex-col">
-            ${thumb}
-            <div class="p-6 flex-1 flex flex-col">
-                <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-bold text-lg text-slate-900 truncate pr-2">${p.name}</h3>
-                    <span class="${badgeClass} px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 flex-shrink-0">
-                        <i data-lucide="${status.icon}" class="w-3 h-3"></i> ${status.label}
-                    </span>
-                </div>
-                <div class="text-gray-500 text-sm mb-4">${renderAddressWithLink(p.display_address, "w-4 h-4")}</div>
-                
-                <div class="text-sm mt-auto text-gray-600">${status.desc}</div>
-                ${actionButton}
-                
-                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-between text-sm">
-                    <span class="text-gray-500">Next Guest</span>
-                    <span class="font-medium text-slate-900">${nextGuest ? nextGuest.toLocaleDateString() : 'None'}</span>
-                </div>
-            </div>
-        </div>`;
+        container.innerHTML = buckets[key].map(job => renderCard(job)).join('');
     });
-    html += '</div>';
 
-    contentDiv.innerHTML = html;
     lucide.createIcons();
+}
+
+function renderCard(job) {
+    let typeColor = 'bg-gray-100 text-gray-600';
+    if (job.type === 'Cleaning') typeColor = 'bg-blue-100 text-blue-700';
+    if (job.type === 'Inspection') typeColor = 'bg-purple-100 text-purple-700';
+    if (job.type === 'Kitting') typeColor = 'bg-yellow-100 text-yellow-700';
+
+    const dateDisplay = job.scheduled_at
+        ? `<span class="text-xs text-gray-500 flex items-center"><i data-lucide="clock" class="w-3 h-3 mr-1"></i> ${new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`
+        : `<span class="text-xs text-orange-400 flex items-center" title="Using Due Date"><i data-lucide="calendar" class="w-3 h-3 mr-1"></i> Due</span>`;
+
+    return `
+    <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition cursor-pointer group">
+        <div class="flex justify-between items-start mb-2">
+            <span class="text-[10px] font-bold uppercase tracking-wider ${typeColor} px-1.5 py-0.5 rounded">${job.type}</span>
+            ${dateDisplay}
+        </div>
+        <h4 class="font-bold text-slate-800 text-sm mb-1 leading-tight">${job.property_name}</h4>
+        <p class="text-xs text-gray-500 mb-3">${job.service_name || 'Ad-hoc Job'}</p>
+        
+        <div class="flex justify-between items-center pt-2 border-t border-gray-50">
+            <div class="flex -space-x-2">
+                <!-- Avatar placeholder -->
+                <div class="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-[8px] font-bold text-gray-500">?</div>
+            </div>
+            <span class="text-xs font-medium text-slate-400 group-hover:text-blue-600 transition">${job.status}</span>
+        </div>
+    </div>`;
 }

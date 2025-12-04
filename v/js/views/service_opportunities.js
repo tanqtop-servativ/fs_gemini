@@ -54,7 +54,7 @@ async function loadOppTable() {
         .select(`
             *,
             properties (name),
-            job_templates (name)
+            service_templates (name)
         `)
         .eq('tenant_id', tenantId)
         .is('deleted_at', null)
@@ -72,19 +72,22 @@ async function loadOppTable() {
     tbody.innerHTML = opps.map(o => {
         const relatedJobs = jobs ? jobs.filter(j => j.service_opportunity_id === o.id) : [];
         const propertyName = o.properties ? o.properties.name : 'Unknown Property';
-        const templateName = o.job_templates ? o.job_templates.name : 'Unknown Service';
+        const templateName = o.service_templates ? o.service_templates.name : 'Unknown Service';
 
         // Workflow Visualization
         let workflowHTML = '<span class="text-gray-400 text-xs">-</span>';
         if (relatedJobs.length > 0) {
-            workflowHTML = `<div class="flex gap-1">
-                ${relatedJobs.map(j => {
+            workflowHTML = `<div class="flex items-center gap-1">
+                ${relatedJobs.sort((a, b) => a.id - b.id).map((j, index) => {
                 let color = 'bg-gray-100 text-gray-600';
                 if (j.status === 'Complete') color = 'bg-green-100 text-green-700';
                 if (j.status === 'In Progress') color = 'bg-blue-100 text-blue-700';
                 if (j.status === 'Pending') color = 'bg-yellow-50 text-yellow-600 border border-yellow-100';
 
-                return `<span class="text-[10px] px-2 py-0.5 rounded ${color} font-medium border border-transparent" title="${j.type}: ${j.status}">${j.type}</span>`;
+                const badge = `<span class="text-[10px] px-2 py-0.5 rounded ${color} font-medium border border-transparent" title="${j.type}: ${j.status}">${j.type}</span>`;
+
+                if (index === 0) return badge;
+                return `<i data-lucide="arrow-right" class="w-3 h-3 text-gray-300"></i>${badge}`;
             }).join('')}
             </div>`;
         } else if (o.status === 'Pending') {
@@ -146,10 +149,10 @@ async function openEditOppModal(opp) {
 
     // Fetch Properties & Templates
     const { data: properties } = await supabase.from('properties').select('id, name').eq('tenant_id', tenantId);
-    const { data: templates } = await supabase.from('job_templates').select('id, name').eq('tenant_id', tenantId);
+    const { data: templates } = await supabase.from('service_templates').select('id, name').eq('tenant_id', tenantId);
 
     const propOptions = properties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    const tempOptions = templates.map(t => `<option value="${t.id}" ${opp && opp.job_template_id === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
+    const tempOptions = templates.map(t => `<option value="${t.id}" ${opp && opp.service_template_id === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
 
     container.innerHTML = `
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -230,7 +233,7 @@ async function openEditOppModal(opp) {
         if (opp) {
             // Update
             const { error: err } = await supabase.from('service_opportunities').update({
-                job_template_id: tempId,
+                service_template_id: tempId,
                 trigger_source: source,
                 due_date: date || null
             }).eq('id', opp.id);
@@ -240,7 +243,7 @@ async function openEditOppModal(opp) {
             const { error: err } = await supabase.from('service_opportunities').insert({
                 tenant_id: tenantId,
                 property_id: propId,
-                job_template_id: tempId,
+                service_template_id: tempId,
                 trigger_source: source,
                 due_date: date || null,
                 status: 'Pending'
@@ -264,13 +267,17 @@ async function openDetailModal(opp) {
     // For simplicity, let's just show what we have or fetch if needed.
     // The 'opp' object passed from viewServiceOpp comes from a fresh fetch, so let's enrich it there or here.
 
+    // Fetch related names if not present (though we usually fetch them in the table)
+    // For simplicity, let's just show what we have or fetch if needed.
+    // The 'opp' object passed from viewServiceOpp comes from a fresh fetch, so let's enrich it there or here.
+
     // Let's fetch enriched data for the modal
     const { data: enrichedOpp, error } = await supabase
         .from('service_opportunities')
         .select(`
             *,
             properties (name),
-            job_templates (name, description)
+            service_templates (name, description)
         `)
         .eq('id', opp.id)
         .single();
@@ -278,8 +285,8 @@ async function openDetailModal(opp) {
     if (error) return alert("Error fetching details: " + error.message);
 
     const propName = enrichedOpp.properties ? enrichedOpp.properties.name : 'Unknown';
-    const serviceName = enrichedOpp.job_templates ? enrichedOpp.job_templates.name : 'Unknown';
-    const serviceDesc = enrichedOpp.job_templates ? enrichedOpp.job_templates.description : '';
+    const serviceName = enrichedOpp.service_templates ? enrichedOpp.service_templates.name : 'Unknown';
+    const serviceDesc = enrichedOpp.service_templates ? enrichedOpp.service_templates.description : '';
 
     container.innerHTML = `
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
