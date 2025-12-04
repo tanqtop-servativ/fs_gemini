@@ -223,7 +223,7 @@ async function handleSession(session) {
     if (window.currentUser.is_superuser) {
         const impersonatedTenantId = localStorage.getItem('impersonated_tenant_id');
         if (impersonatedTenantId) {
-            window.currentUser.tenant_id = parseInt(impersonatedTenantId);
+            window.currentUser.tenant_id = impersonatedTenantId;
             window.currentUser.is_impersonating = true;
             console.log("🕵️ Impersonating Tenant:", window.currentUser.tenant_id);
         }

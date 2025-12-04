@@ -86,7 +86,7 @@ async function openDetailRoleModal(id) {
             <p class="text-gray-600 mb-8">${r.description || 'No description provided.'}</p>
             <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
                 ${isDeleted
-            ? `<button onclick="window.restoreRole(${r.id})" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
+            ? `<button onclick="window.restoreRole('${r.id}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
             : `<button id="btn-edit" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit</button>`
         }
             </div>
@@ -115,7 +115,7 @@ async function openEditRoleModal(role) {
                 <input id="inp-desc" class="w-full border p-2 rounded" placeholder="Description" value="${role ? role.description || '' : ''}">
             </div>
             <div class="flex justify-between mt-6 gap-3">
-                 ${role ? `<button onclick="window.deleteRole(${role.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
+                 ${role ? `<button onclick="window.deleteRole('${role.id}')" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
                 <div class="flex gap-2">
                     <button id="btn-cancel" class="px-4 py-2">Cancel</button>
                     <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">Save</button>

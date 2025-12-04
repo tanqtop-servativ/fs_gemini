@@ -91,7 +91,7 @@ async function loadOppTable() {
             }).join('')}
             </div>`;
         } else if (o.status === 'Pending') {
-            workflowHTML = `<button onclick="window.generateWorkflow(${o.id})" class="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 font-bold">Generate Jobs</button>`;
+            workflowHTML = `<button onclick="window.generateWorkflow('${o.id}')" class="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 font-bold">Generate Jobs</button>`;
         }
 
         return `
@@ -105,7 +105,7 @@ async function loadOppTable() {
             </td>
             <td class="px-6 py-4">${workflowHTML}</td>
             <td class="px-6 py-4 text-right">
-                <button onclick="window.viewServiceOpp(${o.id})" class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                <button onclick="window.viewServiceOpp('${o.id}')" class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
             </td>
         </tr>
     `}).join('');

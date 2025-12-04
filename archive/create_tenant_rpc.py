@@ -13,7 +13,7 @@ def create_rpc():
         
         print("🛠️ Creating 'create_tenant_for_user' RPC...")
         
-        rpc_sql = """
+        cur.execute("""
         CREATE OR REPLACE FUNCTION public.create_tenant_for_user(
             p_tenant_name text, 
             p_user_id uuid, 
@@ -24,11 +24,11 @@ def create_rpc():
         RETURNS jsonb
         LANGUAGE plpgsql
         SECURITY DEFINER
-        AS $function$
+        AS $$
         DECLARE
-            v_tenant_id integer;
-            v_person_id integer;
-            v_role_id integer;
+            v_tenant_id uuid;
+            v_person_id uuid;
+            v_role_id uuid;
         BEGIN
             -- 1. Create Tenant
             INSERT INTO tenants (name) VALUES (p_tenant_name) RETURNING id INTO v_tenant_id;
@@ -61,10 +61,9 @@ def create_rpc():
                 'person_id', v_person_id
             );
         END;
-        $function$;
-        """
+        $$;
+        """)
         
-        cur.execute(rpc_sql)
         conn.commit()
         print("✅ RPC created successfully.")
             

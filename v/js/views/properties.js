@@ -386,8 +386,8 @@ async function openEditModal(prop) {
     const isArchived = prop && prop.status === 'archived';
     const deleteBtn = prop
         ? (isArchived
-            ? `<button onclick="window.restoreProperty(${prop.id})" class="text-green-600 hover:text-green-800 font-bold text-sm px-2 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore Property</button>`
-            : `<button onclick="window.deleteProperty(${prop.id})" class="text-red-500 hover:text-red-700 font-bold text-sm px-2">Archive Property</button>`)
+            ? `<button onclick="window.restoreProperty('${prop.id}')" class="text-green-600 hover:text-green-800 font-bold text-sm px-2 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore Property</button>`
+            : `<button onclick="window.deleteProperty('${prop.id}')" class="text-red-500 hover:text-red-700 font-bold text-sm px-2">Archive Property</button>`)
         : '<div></div>';
 
     let tmplOpts = '<option value="">Apply Template...</option>';
@@ -576,7 +576,7 @@ async function openEditModal(prop) {
                 <a href="${a.public_url}" target="_blank" class="text-xs text-blue-600 hover:underline flex items-center gap-2">
                     <i data-lucide="file" class="w-3 h-3"></i> ${a.file_name}
                 </a>
-                <button onclick="window.deleteAttachment(${a.id})" class="text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                <button onclick="window.deleteAttachment('${a.id}')" class="text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
             </div>
         `).join('');
         lucide.createIcons();
@@ -649,7 +649,7 @@ async function openEditModal(prop) {
                         <span class="text-[10px] uppercase font-bold text-gray-500">Reference</span>
                     </label>
                 </div>
-                <button onclick="window.deleteRefPhoto(${p.id})" class="text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                <button onclick="window.deleteRefPhoto('${p.id}')" class="text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             </div>
         `).join('');
         lucide.createIcons();
@@ -661,7 +661,7 @@ async function openEditModal(prop) {
                 handle: '.drag-handle',
                 onEnd: async (evt) => {
                     // Re-calculate Sort Order based on DOM
-                    const newOrderIds = Array.from(div.querySelectorAll('.ref-photo-item')).map(el => parseInt(el.dataset.id));
+                    const newOrderIds = Array.from(div.querySelectorAll('.ref-photo-item')).map(el => el.dataset.id);
 
                     // Update DB Loop (Simple)
                     for (let i = 0; i < newOrderIds.length; i++) {
@@ -864,13 +864,13 @@ async function openEditModal(prop) {
 
         const feedRows = document.querySelectorAll('.feed-row');
         const feedsData = Array.from(feedRows).map(row => ({
-            id: row.dataset.id ? parseInt(row.dataset.id) : null,
+            id: row.dataset.id ? row.dataset.id : null,
             name: row.querySelector('.feed-type').value,
             url: row.querySelector('.feed-url').value.trim()
         })).filter(f => f.url.length > 0);
 
-        const ownerIds = Array.from(document.querySelectorAll('.chk-owner:checked')).map(cb => parseInt(cb.value));
-        const mgrIds = Array.from(document.querySelectorAll('.chk-manager:checked')).map(cb => parseInt(cb.value));
+        const ownerIds = Array.from(document.querySelectorAll('.chk-owner:checked')).map(cb => cb.value);
+        const mgrIds = Array.from(document.querySelectorAll('.chk-manager:checked')).map(cb => cb.value);
 
         const payload = {
             p_name: name,

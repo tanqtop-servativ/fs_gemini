@@ -120,7 +120,7 @@ async function openDetailPersonModal(id) {
 
              <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
                 ${isDeleted
-            ? `<button onclick="window.restorePerson(${p.id})" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
+            ? `<button onclick="window.restorePerson('${p.id}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
             : `<button id="btn-edit" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit</button>`
         }
             </div>
@@ -213,7 +213,7 @@ async function openEditPersonModal(person) {
                 ${userCreationHTML}
             </div>
             <div class="flex justify-between mt-6 gap-3">
-                 ${person ? `<button onclick="window.deletePerson(${person.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
+                 ${person ? `<button onclick="window.deletePerson('${person.id}')" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
                 <div class="flex gap-2">
                     <button id="btn-cancel" class="px-4 py-2 hover:bg-gray-100 rounded">Cancel</button>
                     <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">Save</button>
@@ -303,7 +303,7 @@ async function openEditPersonModal(person) {
 
         // 2. Save Person Record
         const roleIds = Array.from(document.querySelectorAll('input[name="role_checkbox"]:checked'))
-            .map(cb => parseInt(cb.value));
+            .map(cb => cb.value);
 
         const { data: savedPerson, error } = await supabase.rpc('save_person_safe', {
             p_id: person ? person.id : null,

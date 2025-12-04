@@ -72,10 +72,10 @@ export async function renderSuperuserDashboard(container) {
                                     <td class="px-6 py-4 font-medium text-slate-900">${t.name}</td>
                                     <td class="px-6 py-4 text-gray-500">${new Date(t.created_at).toLocaleDateString()}</td>
                                     <td class="px-6 py-4 text-right flex justify-end gap-2">
-                                        <button onclick="window.impersonateTenant(${t.id})" class="text-indigo-600 hover:text-indigo-800 transition-colors p-1 font-bold text-xs border border-indigo-200 rounded bg-indigo-50 hover:bg-indigo-100 px-2" title="Switch to this Tenant">
+                                        <button onclick="window.impersonateTenant('${t.id}')" class="text-indigo-600 hover:text-indigo-800 transition-colors p-1 font-bold text-xs border border-indigo-200 rounded bg-indigo-50 hover:bg-indigo-100 px-2" title="Switch to this Tenant">
                                             Switch
                                         </button>
-                                        <button onclick="window.openManageTenantModal(${t.id}, '${t.name}')" class="text-gray-400 hover:text-indigo-600 transition-colors p-1" title="View Details">
+                                        <button onclick="window.openManageTenantModal('${t.id}', '${t.name}')" class="text-gray-400 hover:text-indigo-600 transition-colors p-1" title="View Details">
                                             <i data-lucide="eye" class="w-5 h-5"></i>
                                         </button>
                                     </td>

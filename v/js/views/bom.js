@@ -115,7 +115,7 @@ async function openDetailBOMModal(id) {
             </div>
             <div class="mt-6 pt-4 border-t border-gray-100 flex justify-end gap-3">
                 ${isDeleted
-            ? `<button onclick="window.restoreBOM(${tmpl.id})" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
+            ? `<button onclick="window.restoreBOM('${tmpl.id}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore</button>`
             : `<button id="btn-edit-bom" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit Template</button>`
         }
             </div>
@@ -168,7 +168,7 @@ async function openEditBOMModal(template) {
                 <div id="bom-items-list" class="flex-1 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50 space-y-1"></div>
             </div>
             <div class="flex justify-between mt-4 gap-3">
-                ${template ? `<button onclick="window.deleteBOM(${template.id})" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
+                ${template ? `<button onclick="window.deleteBOM('${template.id}')" class="text-red-500 hover:text-red-700 font-bold text-sm">Archive</button>` : '<div></div>'}
                 <div class="flex gap-2">
                     <button id="btn-cancel" class="px-4 py-2">Cancel</button>
                     <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">Save</button>

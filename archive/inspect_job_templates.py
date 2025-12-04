@@ -6,37 +6,22 @@ load_dotenv()
 
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
 
-def inspect_table(cur, table_name):
-    print(f"\n--- {table_name} ---")
-    cur.execute(f"""
-        SELECT column_name, data_type, is_nullable
-        FROM information_schema.columns
-        WHERE table_name = '{table_name}';
-    """)
-    columns = cur.fetchall()
-    for col in columns:
-        print(col)
-
-try:
-    conn = psycopg2.connect(DB_CONNECTION_STRING)
-    cur = conn.cursor()
-    
-    inspect_table(cur, 'job_templates')
-    inspect_table(cur, 'job_template_tasks')
-    
-    # Check for RPCs
-    print("\n--- Related Functions ---")
-    cur.execute("""
-        SELECT routine_name 
-        FROM information_schema.routines 
-        WHERE routine_schema = 'public' AND routine_name LIKE '%job_template%';
-    """)
-    funcs = cur.fetchall()
-    for f in funcs:
-        print(f)
-
-except Exception as e:
-    print(f"❌ Error: {e}")
-finally:
-    if 'conn' in locals() and conn:
+def inspect_templates():
+    try:
+        conn = psycopg2.connect(DB_CONNECTION_STRING)
+        cur = conn.cursor()
+        
+        print("🔍 Inspecting Job Templates...")
+        cur.execute("SELECT id, name FROM job_templates")
+        rows = cur.fetchall()
+        
+        for row in rows:
+            print(f"   [{row[0]}] {row[1]}")
+            
+        cur.close()
         conn.close()
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+if __name__ == "__main__":
+    inspect_templates()

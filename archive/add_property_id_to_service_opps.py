@@ -11,18 +11,18 @@ def add_column():
         conn = psycopg2.connect(DB_CONNECTION_STRING)
         cur = conn.cursor()
         
-        print("🚀 Adding 'service_template_id' to service_opportunities...")
+        print("🚀 Adding 'property_id' to service_opportunities...")
         
         # 1. Add Column
         cur.execute("""
             ALTER TABLE service_opportunities 
-            ADD COLUMN IF NOT EXISTS service_template_id UUID REFERENCES service_templates(id);
+            ADD COLUMN IF NOT EXISTS property_id UUID REFERENCES properties(id);
         """)
         
-        # 2. Add Index
+        # 2. Add Index (Good practice)
         cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_service_opps_service_template_id 
-            ON service_opportunities(service_template_id);
+            CREATE INDEX IF NOT EXISTS idx_service_opps_property_id 
+            ON service_opportunities(property_id);
         """)
         
         conn.commit()

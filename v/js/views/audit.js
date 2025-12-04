@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js';
 
 export async function renderAuditHistory(containerId, tableName, recordId) {
-    const rId = parseInt(recordId);
+    const rId = recordId;
     const container = document.getElementById(containerId);
     if (!container) return;
 
