@@ -482,31 +482,55 @@ function openCreateTenantModal() {
             return;
         }
 
-        btn.innerText = "Creating...";
+        btn.innerText = "Creating User...";
         btn.disabled = true;
 
-        const { data, error } = await supabase.rpc('create_tenant_with_admin', {
-            p_tenant_name: name,
-            p_admin_email: email,
-            p_admin_password: pass,
-            p_admin_first_name: first,
-            p_admin_last_name: last,
-            p_acting_user_id: window.currentUser?.id
-        });
+        try {
+            // 1. Create Auth User via Python API (Service Role)
+            const apiResponse = await fetch('http://localhost:8080/create-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: email,
+                    password: pass,
+                    invite: false
+                })
+            });
 
-        if (error) {
-            console.error(error);
-            alert("Error creating tenant: " + error.message);
+            if (!apiResponse.ok) {
+                const errText = await apiResponse.text();
+                throw new Error("Failed to create user: " + errText);
+            }
+
+            const apiData = await apiResponse.json();
+            const userId = apiData.user.id; // UUID from Supabase
+
+            btn.innerText = "Setting up Tenant...";
+
+            // 2. Create Tenant & Link User via RPC
+            const { data, error } = await supabase.rpc('create_tenant_for_user', {
+                p_tenant_name: name,
+                p_user_id: userId,
+                p_first_name: first,
+                p_last_name: last,
+                p_email: email
+            });
+
+            if (error) throw error;
+
+            alert("Tenant created successfully! The manager can now log in.");
+            safeClose(true);
+
+            // Refresh dashboard
+            const mainContainer = document.getElementById('main-canvas');
+            if (mainContainer) renderSuperuserDashboard(mainContainer);
+
+        } catch (err) {
+            console.error(err);
+            alert("Error: " + err.message);
             btn.innerText = "Create Tenant";
             btn.disabled = false;
-            return;
         }
-
-        alert("Tenant created successfully!");
-        safeClose(true);
-        // Refresh dashboard
-        const mainContainer = document.getElementById('main-canvas'); // Hacky way to refresh
-        if (mainContainer) renderSuperuserDashboard(mainContainer);
     };
 
     if (window.lucide) window.lucide.createIcons();

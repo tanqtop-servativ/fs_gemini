@@ -74,16 +74,111 @@ async function initApp() {
         renderLogin();
     }
 
+    // --- Password Reset Logic ---
+    const forgotPasswordLink = document.getElementById('forgot-password-link');
+    const loginForm = document.getElementById('login-form');
+    const forgotPasswordForm = document.getElementById('forgot-password-form');
+    const backToLoginBtn = document.getElementById('back-to-login-btn');
+    const sendResetBtn = document.getElementById('send-reset-btn');
+    const resetMessage = document.getElementById('reset-message');
+    const updatePasswordForm = document.getElementById('update-password-form');
+    const updatePasswordBtn = document.getElementById('update-password-btn');
+
+    // Toggle Forgot Password Form
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginForm.classList.add('hidden');
+            forgotPasswordForm.classList.remove('hidden');
+            resetMessage.classList.add('hidden');
+        });
+    }
+
+    if (backToLoginBtn) {
+        backToLoginBtn.addEventListener('click', () => {
+            forgotPasswordForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            resetMessage.classList.add('hidden');
+        });
+    }
+
+    // Send Reset Link
+    if (sendResetBtn) {
+        sendResetBtn.addEventListener('click', async () => {
+            const email = document.getElementById('reset-email').value;
+            if (!email) return;
+
+            sendResetBtn.disabled = true;
+            sendResetBtn.innerText = 'Sending...';
+
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/v/index.html', // Redirect back to app
+            });
+
+            sendResetBtn.disabled = false;
+            sendResetBtn.innerText = 'Send Reset Link';
+
+            if (error) {
+                resetMessage.innerText = 'Error: ' + error.message;
+                resetMessage.classList.remove('text-green-600');
+                resetMessage.classList.add('text-red-500');
+            } else {
+                resetMessage.innerText = 'Check your email for the reset link!';
+                resetMessage.classList.remove('text-red-500');
+                resetMessage.classList.add('text-green-600');
+            }
+            resetMessage.classList.remove('hidden');
+        });
+    }
+
+    // Update Password (after clicking magic link)
+    if (updatePasswordBtn) {
+        updatePasswordBtn.addEventListener('click', async () => {
+            const newPassword = document.getElementById('new-password').value;
+            if (!newPassword) return;
+
+            updatePasswordBtn.disabled = true;
+            updatePasswordBtn.innerText = 'Updating...';
+
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+            if (error) {
+                alert('Error updating password: ' + error.message);
+                updatePasswordBtn.disabled = false;
+                updatePasswordBtn.innerText = 'Update Password';
+            } else {
+                alert('Password updated successfully! Logging you in...');
+                // Redirect to dashboard
+                window.location.href = '/v/index.html';
+            }
+        });
+    }
+
     // 2. Listen for auth changes
     supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log("Auth State Change:", event, session);
-        if (event === 'SIGNED_IN' && session) {
+        console.log("Auth Event:", event);
+
+        if (event === 'PASSWORD_RECOVERY') {
+            // Show Update Password Form
+            document.getElementById('login-screen').classList.remove('hidden'); // Ensure container is visible
+            loginForm.classList.add('hidden');
+            forgotPasswordForm.classList.add('hidden');
+            updatePasswordForm.classList.remove('hidden');
+        } else if (event === 'SIGNED_IN') {
             await handleSession(session);
         } else if (event === 'SIGNED_OUT') {
             window.currentUser = null;
             renderLogin();
         }
     });
+
+    // Login Button Listener
+    const loginBtn = document.getElementById('btn-login');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            window.attemptLogin();
+        });
+    }
 
     // Handle hash routing
     window.addEventListener('hashchange', () => {
@@ -196,8 +291,10 @@ window.attemptLogin = async function attemptLogin() {
         return;
     }
 
-    // Success! The onAuthStateChange listener in initApp will handle the rest.
+    // Success! 
     console.log("Login successful:", data);
+    // Force navigation to Dashboard on manual login
+    window.location.hash = 'dashboard';
 };
 
 window.logout = async () => {
@@ -205,7 +302,8 @@ window.logout = async () => {
     // onAuthStateChange will handle the renderLogin()
     window.currentUser = null;
     try { localStorage.removeItem('mock_user'); } catch (e) { }
-    location.reload();
+    // Redirect to base URL to clear hash
+    window.location.href = window.location.pathname;
 };
 
 // --- SHELL & NAVIGATION ---
