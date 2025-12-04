@@ -57,6 +57,7 @@ async function loadOppTable() {
             job_templates (name)
         `)
         .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
     const tbody = document.getElementById('opp-body');
@@ -101,7 +102,7 @@ async function loadOppTable() {
             </td>
             <td class="px-6 py-4">${workflowHTML}</td>
             <td class="px-6 py-4 text-right">
-                <button class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                <button onclick="window.viewServiceOpp(${o.id})" class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
             </td>
         </tr>
     `}).join('');
@@ -148,45 +149,74 @@ async function openEditOppModal(opp) {
     const { data: templates } = await supabase.from('job_templates').select('id, name').eq('tenant_id', tenantId);
 
     const propOptions = properties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    const tempOptions = templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    const tempOptions = templates.map(t => `<option value="${t.id}" ${opp && opp.job_template_id === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
 
     container.innerHTML = `
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h3 class="font-bold text-lg mb-4">New Service Opportunity</h3>
+            <h3 class="font-bold text-lg mb-4">${opp ? 'Edit' : 'New'} Service Opportunity</h3>
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property</label>
-                    <select id="sel-property" class="w-full border p-2 rounded bg-white">${propOptions}</select>
+                    <select id="sel-property" class="w-full border p-2 rounded bg-white" ${opp ? 'disabled' : ''}>
+                        ${propOptions}
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Service Template</label>
-                    <select id="sel-template" class="w-full border p-2 rounded bg-white">${tempOptions}</select>
+                    <select id="sel-template" class="w-full border p-2 rounded bg-white">
+                        ${tempOptions}
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Source</label>
                     <select id="sel-source" class="w-full border p-2 rounded bg-white">
-                        <option value="Manual">Manual Entry</option>
-                        <option value="Phone">Phone Call</option>
-                        <option value="Email">Email Request</option>
-                        <option value="Text">Text Message</option>
-                        <option value="In Person">In Person</option>
+                        <option value="Manual" ${opp && opp.trigger_source === 'Manual' ? 'selected' : ''}>Manual Entry</option>
+                        <option value="Phone" ${opp && opp.trigger_source === 'Phone' ? 'selected' : ''}>Phone Call</option>
+                        <option value="Email" ${opp && opp.trigger_source === 'Email' ? 'selected' : ''}>Email Request</option>
+                        <option value="Text" ${opp && opp.trigger_source === 'Text' ? 'selected' : ''}>Text Message</option>
+                        <option value="In Person" ${opp && opp.trigger_source === 'In Person' ? 'selected' : ''}>In Person</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Due Date</label>
-                    <input type="date" id="inp-date" class="w-full border p-2 rounded">
+                    <input type="date" id="inp-date" class="w-full border p-2 rounded" value="${opp && opp.due_date ? opp.due_date.split('T')[0] : ''}">
                 </div>
             </div>
-            <div class="flex justify-end mt-6 gap-2">
-                <button id="btn-cancel" class="px-4 py-2 hover:bg-gray-100 rounded">Cancel</button>
-                <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">Create</button>
+            <div class="flex justify-between mt-6">
+                ${opp ? `<button id="btn-delete" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded font-medium">Delete</button>` : '<div></div>'}
+                <div class="flex gap-2">
+                    <button id="btn-cancel" class="px-4 py-2 hover:bg-gray-100 rounded">Cancel</button>
+                    <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">${opp ? 'Save Changes' : 'Create'}</button>
+                </div>
             </div>
         </div>
     </div>`;
 
+    if (opp) {
+        document.getElementById('sel-property').value = opp.property_id;
+    }
+
     const safeClose = setupModalGuard('modal-container', () => { container.innerHTML = ''; });
     document.getElementById('btn-cancel').onclick = safeClose;
+
+    if (opp) {
+        document.getElementById('btn-delete').onclick = async () => {
+            if (!confirm("Are you sure you want to delete this opportunity?")) return;
+
+            const { error } = await supabase
+                .from('service_opportunities')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', opp.id);
+
+            if (error) {
+                alert("Error deleting: " + error.message);
+            } else {
+                container.innerHTML = '';
+                loadOppTable();
+            }
+        };
+    }
 
     document.getElementById('btn-save').onclick = async () => {
         const propId = document.getElementById('sel-property').value;
@@ -196,14 +226,27 @@ async function openEditOppModal(opp) {
 
         if (!propId || !tempId) return alert("Please select Property and Template");
 
-        const { error } = await supabase.from('service_opportunities').insert({
-            tenant_id: tenantId,
-            property_id: propId,
-            job_template_id: tempId,
-            trigger_source: source,
-            due_date: date || null,
-            status: 'Pending'
-        });
+        let error;
+        if (opp) {
+            // Update
+            const { error: err } = await supabase.from('service_opportunities').update({
+                job_template_id: tempId,
+                trigger_source: source,
+                due_date: date || null
+            }).eq('id', opp.id);
+            error = err;
+        } else {
+            // Create
+            const { error: err } = await supabase.from('service_opportunities').insert({
+                tenant_id: tenantId,
+                property_id: propId,
+                job_template_id: tempId,
+                trigger_source: source,
+                due_date: date || null,
+                status: 'Pending'
+            });
+            error = err;
+        }
 
         if (error) {
             alert("Error: " + error.message);
@@ -213,3 +256,101 @@ async function openEditOppModal(opp) {
         }
     };
 }
+
+async function openDetailModal(opp) {
+    const container = document.getElementById('modal-container');
+
+    // Fetch related names if not present (though we usually fetch them in the table)
+    // For simplicity, let's just show what we have or fetch if needed.
+    // The 'opp' object passed from viewServiceOpp comes from a fresh fetch, so let's enrich it there or here.
+
+    // Let's fetch enriched data for the modal
+    const { data: enrichedOpp, error } = await supabase
+        .from('service_opportunities')
+        .select(`
+            *,
+            properties (name),
+            job_templates (name, description)
+        `)
+        .eq('id', opp.id)
+        .single();
+
+    if (error) return alert("Error fetching details: " + error.message);
+
+    const propName = enrichedOpp.properties ? enrichedOpp.properties.name : 'Unknown';
+    const serviceName = enrichedOpp.job_templates ? enrichedOpp.job_templates.name : 'Unknown';
+    const serviceDesc = enrichedOpp.job_templates ? enrichedOpp.job_templates.description : '';
+
+    container.innerHTML = `
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-slate-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-slate-800">Opportunity Details</h3>
+                <span class="px-2 py-1 rounded text-xs font-bold ${getStatusColor(enrichedOpp.status)}">${enrichedOpp.status}</span>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <div>
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Property</h4>
+                    <p class="text-slate-900 font-medium text-lg">${propName}</p>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Service</h4>
+                    <p class="text-slate-900 font-medium text-lg">${serviceName}</p>
+                    <p class="text-slate-500 text-sm">${serviceDesc || 'No description'}</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Source</h4>
+                        <p class="text-slate-700">${enrichedOpp.trigger_source || 'Manual'}</p>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Due Date</h4>
+                        <p class="text-slate-700">${enrichedOpp.due_date ? new Date(enrichedOpp.due_date).toLocaleDateString() : 'None'}</p>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-100">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Workflow Status</h4>
+                    <div id="modal-workflow-status" class="text-sm text-gray-500">Loading jobs...</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 px-6 py-4 flex justify-between items-center">
+                <button id="btn-edit-opp" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit Details</button>
+                <button id="btn-close" class="bg-white border border-gray-300 text-slate-700 px-4 py-2 rounded hover:bg-gray-50 font-medium shadow-sm">Close</button>
+            </div>
+        </div>
+    </div>`;
+
+    // Fetch jobs for this opp
+    const { data: jobs } = await supabase.from('jobs').select('*').eq('service_opportunity_id', opp.id);
+    const workflowContainer = document.getElementById('modal-workflow-status');
+
+    if (jobs && jobs.length > 0) {
+        workflowContainer.innerHTML = `<div class="space-y-2">
+            ${jobs.map(j => `
+                <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-100">
+                    <span class="font-medium text-slate-700">${j.type}</span>
+                    <span class="text-xs px-2 py-1 rounded ${j.status === 'Complete' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">${j.status}</span>
+                </div>
+            `).join('')}
+        </div>`;
+    } else {
+        workflowContainer.innerHTML = '<p class="italic">No active workflow jobs.</p>';
+    }
+
+    const safeClose = setupModalGuard('modal-container', () => { container.innerHTML = ''; });
+    document.getElementById('btn-close').onclick = safeClose;
+
+    document.getElementById('btn-edit-opp').onclick = () => {
+        openEditOppModal(enrichedOpp);
+    };
+}
+
+window.viewServiceOpp = async (id) => {
+    // We pass a minimal object, openDetailModal will fetch the rest
+    openDetailModal({ id });
+};
