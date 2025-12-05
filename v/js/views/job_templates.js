@@ -403,12 +403,17 @@ export async function renderJobTemplates(container) {
         document.getElementById('btn-cancel').onclick = () => modal.innerHTML = '';
 
         document.getElementById('btn-add-task').onclick = () => {
-            tasks.push({ title: '', description: '', title_es: '', description_es: '', is_required: true, require_photo: false });
+            tasks.push({
+                title: '', description: '', title_es: '', description_es: '',
+                is_required: true, require_photo: false,
+                checklist: [] // Initialize checklist
+            });
             renderTasks();
         };
 
         document.getElementById('btn-library').onclick = () => {
             openLibraryModal((taskData) => {
+                if (!taskData.checklist) taskData.checklist = [];
                 tasks.push(taskData);
                 renderTasks();
             });
