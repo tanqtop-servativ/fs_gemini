@@ -12,16 +12,16 @@ def inspect_properties_schema():
         cur = conn.cursor()
         
         cur.execute("""
-            SELECT column_name, data_type 
-            FROM information_schema.columns 
-            WHERE table_name = 'roles'
-            ORDER BY ordinal_position;
+            SELECT oid::regprocedure
+            FROM pg_proc 
+            WHERE proname IN ('delete_property_safe', 'delete_tenant', 'manage_tenant_user', 'sync_ical_data', 'update_tenant', 'create_property_safe', 'update_property_safe')
+            ORDER BY proname;
         """)
         
-        columns = cur.fetchall()
-        print(f"--- Roles Table Schema ({len(columns)} columns) ---")
-        for col in columns:
-            print(f"{col[0]}: {col[1]}")
+        funcs = cur.fetchall()
+        print(f"--- Function Signatures ({len(funcs)} found) ---")
+        for f in funcs:
+            print(f"{f[0]}")
             
     except Exception as e:
         print(f"Error: {e}")
