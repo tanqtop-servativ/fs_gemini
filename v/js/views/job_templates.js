@@ -105,11 +105,10 @@ export async function renderJobTemplates(container) {
         const tasks = (tmpl.job_template_tasks || []).sort((a, b) => a.sort_order - b.sort_order);
         const modal = document.getElementById('modal-container');
 
-        const taskListHTML = tasks.length > 0 ? tasks.map((t, idx) => `
         const taskListHTML = tasks.length > 0 ? tasks.map((t, idx) => {
             const checklist = (t.job_template_checklist_items || []).sort((a, b) => a.sort_order - b.sort_order);
             const checklistHTML = checklist.length > 0 ? `
-            < div class= "mt-3 bg-slate-50/50 rounded p-2 border border-slate-100" >
+                <div class="mt-3 bg-slate-50/50 rounded p-2 border border-slate-100">
                     <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Checklist</div>
                     <ul class="space-y-1">
                         ${checklist.map(c => `
@@ -123,10 +122,10 @@ export async function renderJobTemplates(container) {
                             </li>
                         `).join('')}
                     </ul>
-                </div > ` : '';
+                </div>` : '';
 
             return `
-        < div class="flex gap-3 items-start p-3 border-b border-gray-100 last:border-0" >
+            <div class="flex gap-3 items-start p-3 border-b border-gray-100 last:border-0">
                 <div class="mt-1 text-slate-400 font-mono text-xs w-6">${idx + 1}.</div>
                 <div class="flex-1">
                     <div class="font-bold text-sm text-slate-800">${t.title}</div>
@@ -137,14 +136,12 @@ export async function renderJobTemplates(container) {
                     </div>
                     ${checklistHTML}
                 </div>
-                ${
-        t.title_es ? `
+                ${t.title_es ? `
                 <div class="flex-1 border-l border-gray-100 pl-3">
                     <div class="font-bold text-sm text-slate-600">${t.title_es}</div>
                     ${t.description_es ? `<div class="text-xs text-gray-400 mt-1">${t.description_es}</div>` : ''}
-                </div>` : ''
-    }
-            </div >
+                </div>` : ''}
+            </div>
         `}).join('') : '<div class="text-gray-400 text-sm italic p-4 text-center">No tasks defined.</div>';
 
         modal.innerHTML = `
@@ -291,7 +288,7 @@ export async function renderJobTemplates(container) {
             list.querySelectorAll('.check-desc').forEach(el => el.oninput = (e) => tasks[el.dataset.tIdx].checklist[el.dataset.cIdx].description = e.target.value);
             list.querySelectorAll('.check-desc-es').forEach(el => el.oninput = (e) => tasks[el.dataset.tIdx].checklist[el.dataset.cIdx].description_es = e.target.value);
             list.querySelectorAll('.check-type').forEach(el => el.onchange = (e) => tasks[el.dataset.tIdx].checklist[el.dataset.cIdx].item_type = e.target.value);
-            
+
             list.querySelectorAll('.btn-del-check').forEach(el => el.onclick = () => {
                 tasks[el.dataset.tIdx].checklist.splice(el.dataset.cIdx, 1);
                 renderTasks();
@@ -318,7 +315,7 @@ export async function renderJobTemplates(container) {
 
                         // Immediate reorder save not implemented for checklists yet (only tasks)
                         // If we are editing an existing template, sync order to DB immediately
-                         if (tmpl && tmpl.id) {
+                        if (tmpl && tmpl.id) {
                             // Reorder Logic for Tasks (matches previous implementation)
                             const items = tasks.map((t, idx) => ({ id: t.id, order: idx }));
                             const validItems = items.filter(i => i.id);
@@ -387,9 +384,9 @@ export async function renderJobTemplates(container) {
 
                 <div class="p-4 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-between">
                     ${isEdit ? (isDeleted
-                        ? `<button id="btn-restore" class="text-green-600 hover:text-green-800 text-sm font-bold px-2 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore Template</button>`
-                        : `<button id="btn-delete" class="text-red-500 hover:text-red-700 text-sm font-bold px-2">Archive Template</button>`)
-                        : '<div></div>'}
+                ? `<button id="btn-restore" class="text-green-600 hover:text-green-800 text-sm font-bold px-2 flex items-center"><i data-lucide="rotate-ccw" class="w-4 h-4 mr-2"></i> Restore Template</button>`
+                : `<button id="btn-delete" class="text-red-500 hover:text-red-700 text-sm font-bold px-2">Archive Template</button>`)
+                : '<div></div>'}
                     <div class="flex gap-2">
                         <button id="btn-cancel" class="px-4 py-2 text-sm hover:bg-gray-200 rounded text-gray-600">Cancel</button>
                         <button id="btn-save" class="bg-black text-white px-6 py-2 rounded text-sm font-bold hover:bg-gray-800">Save Template</button>
