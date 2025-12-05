@@ -51,7 +51,7 @@ BEGIN
     SELECT id INTO role_manager_id FROM roles WHERE name = 'Property Manager';
 
     INSERT INTO properties (
-        tenant_id, name, display_address, hcp_customer_id, hcp_address_id, 
+        tenant_id, name, address, hcp_customer_id, hcp_address_id, 
         check_in_time, check_out_time, front_photo_url, 
         wifi_network, wifi_password,
         bedrooms, bathrooms, max_guests, has_pool, has_bbq, allows_pets, parking_instructions,
@@ -162,7 +162,7 @@ BEGIN
     SELECT id INTO role_manager_id FROM roles WHERE name = 'Property Manager';
 
     UPDATE properties 
-    SET name = p_name, display_address = p_address, hcp_customer_id = p_hcp_cust, hcp_address_id = p_hcp_addr, 
+    SET name = p_name, address = p_address, hcp_customer_id = p_hcp_cust, hcp_address_id = p_hcp_addr, 
         check_in_time = p_checkin, check_out_time = p_checkout, front_photo_url = p_photo_url,
         wifi_network = p_wifi_network, wifi_password = p_wifi_password,
         bedrooms = p_bedrooms, bathrooms = p_bathrooms, max_guests = p_max_guests,
