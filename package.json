@@ -1,0 +1,32 @@
+{
+  "name": "ical_gemini",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tailwindcss -i ./v/css/input.css -o ./v/css/output.css",
+    "watch": "tailwindcss -i ./v/css/input.css -o ./v/css/output.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tanqtop-servativ/fs_gemini.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tanqtop-servativ/fs_gemini/issues"
+  },
+  "homepage": "https://github.com/tanqtop-servativ/fs_gemini#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.18"
+  },
+  "dependencies": {
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6"
+  }
+}

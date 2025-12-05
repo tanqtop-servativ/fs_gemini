@@ -1,5 +1,6 @@
-import os
+
 import psycopg2
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,18 +12,21 @@ def inspect_schema():
         conn = psycopg2.connect(DB_CONNECTION_STRING)
         cur = conn.cursor()
         
+        print("🔹 Table: properties columns:")
         cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
+            SELECT column_name, data_type
+            FROM information_schema.columns
             WHERE table_name = 'properties'
+            ORDER BY ordinal_position;
         """)
-        for col in cur.fetchall():
-            print(col[0])
-            
-        cur.close()
-        conn.close()
+        columns = cur.fetchall()
+        for col in columns:
+            print(f"   - {col[0]} ({col[1]})")
+
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
+    finally:
+        if conn: conn.close()
 
 if __name__ == "__main__":
     inspect_schema()

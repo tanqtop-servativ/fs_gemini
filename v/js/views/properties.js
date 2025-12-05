@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { renderAuditHistory } from './audit.js';
+import { renderEmbeddedCalendar } from './calendar.js';
 import { setupModalGuard } from '../modal_utils.js';
 import { getTenantId, renderAddressWithLink } from '../utils.js';
 import { uploadFile } from '../storage_utils.js';
@@ -40,6 +41,9 @@ export async function renderProperties(container) {
 }
 
 async function loadTableData(showArchived = false) {
+    const tbody = document.getElementById('props-body');
+    if (!tbody) return; // View was changed
+
     let query = supabase.from('properties_enriched').select('*');
 
     if (showArchived) {
@@ -53,8 +57,24 @@ async function loadTableData(showArchived = false) {
         query = query.eq('tenant_id', window.currentUser.tenant_id);
     }
 
-    const { data: props, error } = await query.order('name');
-    const tbody = document.getElementById('props-body');
+    // Add timeout to prevent query from hanging forever
+    let props, error;
+    try {
+        const queryPromise = query.order('name');
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Query timed out')), 10000)
+        );
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+        props = result.data;
+        error = result.error;
+    } catch (e) {
+        console.error('Properties query failed:', e.message);
+        if (!tbody) return;
+        tbody.innerHTML = `<tr><td colspan="4" class="text-red-500 px-6 py-4">Error: ${e.message}. Please refresh the page.</td></tr>`;
+        return;
+    }
+
+    if (!tbody) return; // View was changed during query
     if (error) return tbody.innerHTML = `<tr><td colspan="4" class="text-red-500 px-6 py-4">Error: ${error.message}</td></tr>`;
     if (!props || !props.length) return tbody.innerHTML = `<tr><td colspan="4" class="text-center px-6 py-8 text-gray-400">No properties found.</td></tr>`;
 
@@ -77,19 +97,69 @@ async function loadTableData(showArchived = false) {
                 <div class="flex items-center gap-1"><span class="font-bold text-slate-400 w-12">Own:</span> ${p.owner_names || 'None'}</div>
                 <div class="flex items-center gap-1"><span class="font-bold text-slate-400 w-12">Mgr:</span> ${p.manager_names || 'None'}</div>
             </td>
-            <td class="px-6 py-4 text-right">
-                <button class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
+            <td class="px-6 py-4 text-right" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-end gap-2">
+                    <button class="text-slate-400 hover:text-blue-600 p-2" onclick="window.viewPropCalendar('${p.id}', '${p.name}')" title="View Calendar">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                    </button>
+                    <button class="text-slate-400 hover:text-blue-600 p-2" onclick="window.viewProp('${p.id}')" title="View Details">
+                        <i data-lucide="eye" class="w-4 h-4"></i>
+                    </button>
+                </div>
             </td>
         </tr>`;
     }).join('');
 
     window.viewProp = (id) => openDetailModal(id);
+    window.viewPropCalendar = (id, name) => openPropertyCalendarModal(id, name);
     lucide.createIcons();
 }
 
 async function openDetailModal(propId) {
     const { data: prop } = await supabase.from('properties_enriched').select('*').eq('id', propId).single();
     if (prop) openReadModal(prop);
+}
+
+// --- CALENDAR MODAL ---
+async function openPropertyCalendarModal(propId, propName) {
+    // Use spawnModal for stacking
+    const html = `
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-4xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+                <!-- Header -->
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-5 h-5 text-gray-500"></i>
+                            ${propName}
+                        </h2>
+                        <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Property Calendar</p>
+                    </div>
+                    <button id="btn-close-cal-${propId}" class="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <!-- Body -->
+                <div class="flex-1 p-6 overflow-hidden bg-slate-50">
+                    <div id="prop-cal-container-${propId}" class="h-full bg-white rounded-xl shadow-sm border border-gray-200 p-4"></div>
+                </div>
+            </div>
+        </div>`;
+
+    import('../modal_utils.js').then(async ({ spawnModal }) => {
+        const { container, close, attemptClose } = spawnModal(html, () => {
+            if (calCleanup) calCleanup();
+        });
+
+        // Bind Close Button
+        const closeBtn = container.querySelector(`#btn-close-cal-${propId}`);
+        if (closeBtn) closeBtn.onclick = attemptClose;
+
+        // Init Calendar
+        const calWrapper = container.querySelector(`#prop-cal-container-${propId}`);
+        const calCleanup = await renderEmbeddedCalendar(calWrapper, propId);
+    });
 }
 
 // --- READ MODAL ---
@@ -109,8 +179,11 @@ async function openReadModal(prop) {
         ? `<img src="${prop.front_photo_url}" class="w-full h-64 object-cover rounded-t-xl">`
         : `<div class="w-full h-64 bg-slate-100 flex items-center justify-center text-slate-400"><i data-lucide="image" class="w-12 h-12"></i></div>`;
 
-    const feedList = (feeds && feeds.length)
-        ? feeds.map(f => `<div class="text-xs flex justify-between border-b border-gray-50 py-1"><span>${f.name}</span><span class="text-gray-400 truncate w-32">${f.url}</span></div>`).join('')
+    const feedList = (feeds && feeds.length > 0)
+        ? feeds.map(f => `<div class="text-xs flex items-center gap-3 border-b border-gray-50 py-2 last:border-0">
+            <span class="font-bold text-slate-700 w-32 shrink-0 truncate" title="${f.name}">${f.name}</span>
+            <a href="${f.url}" target="_blank" class="text-blue-500 hover:underline truncate flex-1 font-mono">${f.url}</a>
+        </div>`).join('')
         : null;
 
     const invList = (inventory && inventory.length)
@@ -264,11 +337,7 @@ async function openReadModal(prop) {
                             <div class="max-h-40 overflow-y-auto">${invList}</div>
                         </div>` : ''}
 
-                        ${feedList ? `
-                        <div class="mb-4">
-                            <h3 class="text-xs font-bold uppercase text-gray-500 mb-2 border-b pb-1">Calendar Feeds</h3>
-                            <div class="max-h-32 overflow-y-auto">${feedList}</div>
-                        </div>` : ''}
+
 
                         ${attList ? `
                         <div class="mb-4">
@@ -284,11 +353,26 @@ async function openReadModal(prop) {
                     <div>
                         <h3 class="text-xs font-bold uppercase text-gray-500 mb-2 border-b pb-1">People</h3>
                         <div class="space-y-2 text-sm mb-4">
-                            <div><span class="text-xs text-gray-400 block">Owners</span>${prop.owner_names || '-'}</div>
-                            <div><span class="text-xs text-gray-400 block">Managers</span>${prop.manager_names || '-'}</div>
+                            <div><span class="text-xs text-gray-400 block">Owner(s)</span>${prop.owner_names || '-'}</div>
+                            <div><span class="text-xs text-gray-400 block">Property Manager(s)</span>${prop.manager_names || '-'}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold uppercase text-gray-500 mb-2 border-b pb-1">Integrations</h3>
+                        <div class="space-y-2 text-sm mb-4">
+                            <div><span class="text-xs text-gray-400 block">HCP Customer ID</span>${prop.hcp_customer_id || '-'}</div>
+                            <div><span class="text-xs text-gray-400 block">HCP Address ID</span>${prop.hcp_address_id || '-'}</div>
                         </div>
                     </div>
                 </div>
+
+                ${feedList ? `
+                <div class="mb-6">
+                    <h3 class="text-xs font-bold uppercase text-gray-500 mb-2 border-b pb-1">Calendar Feeds</h3>
+                    <div class="border border-gray-100 rounded p-2 bg-gray-50/50">
+                        ${feedList}
+                    </div>
+                </div>` : ''}
 
                 <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
                     <button id="btn-close-read" class="px-4 py-2 text-sm hover:bg-gray-100 rounded">Close</button>
@@ -532,13 +616,19 @@ async function openEditModal(prop) {
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
-                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Owners <span class="text-red-500">*</span></label><div id="list-owners" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
-                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property Managers <span class="text-red-500">*</span></label><div id="list-managers" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
+                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Owner(s) <span class="text-red-500">*</span></label><div id="list-owners" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
+                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property Manager(s) <span class="text-red-500">*</span></label><div id="list-managers" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
-                    <input id="inp-cust" class="border p-2 rounded text-xs text-gray-400" placeholder="HCP Cust ID" value="${valCust}">
-                    <input id="inp-hcp-addr" class="border p-2 rounded text-xs text-gray-400" placeholder="HCP Addr ID" value="${valHcpAddr}">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-500 mb-1">HCP Customer ID</label>
+                        <input id="inp-cust" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 12345" value="${valCust}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-500 mb-1">HCP Address ID</label>
+                        <input id="inp-hcp-addr" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 67890" value="${valHcpAddr}">
+                    </div>
                 </div>
 
                 <div class="flex justify-between pt-4 mt-2 border-t border-gray-100">

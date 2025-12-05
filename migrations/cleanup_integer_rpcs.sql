@@ -189,7 +189,7 @@ BEGIN
     IF v_existing_booking_id IS NULL THEN
       -- A. Create Booking
       INSERT INTO bookings (property_id, feed_id, uid, start_date, end_date, status, ical_summary)
-      VALUES (v_prop_id, p_feed_id, v_uid, v_booking_start, v_booking_end, 'CONFIRMED', event_record->>'summary')
+      VALUES (v_prop_id, p_feed_id, v_uid, v_booking_start, v_booking_end, 'confirmed', event_record->>'summary')
       RETURNING id INTO v_booking_id;
 
       -- B. Create INTERNAL JOB (Using the safe v_tenant_id)

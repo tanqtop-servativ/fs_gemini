@@ -22,18 +22,24 @@ export async function renderAuditHistory(containerId, tableName, recordId) {
     let logs, error;
 
     if (tableName === 'properties') {
-        // Use the new RPC to fetch property + related history
-        // const res = await supabase.rpc('get_property_audit_history', { p_property_id: rId });
-        // logs = res.data;
-        // error = res.error;
-        console.warn("Property audit RPC missing");
-        logs = [];
+        // Use the RPC to fetch property + related history
+        const res = await supabase.rpc('get_property_audit_history', { p_property_id: rId });
+        logs = res.data;
+        error = res.error;
     } else if (tableName === 'bom_templates') {
         const res = await supabase.rpc('get_bom_audit_history', { p_bom_id: rId });
         logs = res.data;
         error = res.error;
     } else if (tableName === 'job_templates') {
         const res = await supabase.rpc('get_job_audit_history', { p_job_id: rId });
+        logs = res.data;
+        error = res.error;
+    } else if (tableName === 'job_templates') {
+        const res = await supabase.rpc('get_job_audit_history', { p_job_id: rId });
+        logs = res.data;
+        error = res.error;
+    } else if (tableName === 'service_templates') {
+        const res = await supabase.rpc('get_service_audit_history', { p_service_id: rId });
         logs = res.data;
         error = res.error;
     } else {

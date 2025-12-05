@@ -1,0 +1,4 @@
+
+ALTER TABLE service_opportunities 
+ADD COLUMN IF NOT EXISTS due_date TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS trigger_source TEXT;

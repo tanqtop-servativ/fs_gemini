@@ -6,10 +6,14 @@ import { renderPeople } from './views/people.js';
 import { renderBOM } from './views/bom.js';
 import { renderRoles } from './views/roles.js';
 import { renderJobTemplates } from './views/job_templates.js';
+import { renderServiceTemplates } from './views/service_templates.js';
 import { renderServiceOpportunities } from './views/service_opportunities.js';
 import { renderSuperuserDashboard } from './views/superuser.js';
 
 import { renderActivityFeed } from './views/activity_feed.js';
+
+// UI Diagnostics (run `enableDiagnostics()` in console to start monitoring)
+import './diagnostics.js';
 
 // --- STATE ---
 window.currentUser = null;
@@ -23,6 +27,7 @@ const MENU_ITEMS = [
     { id: 'people', label: 'People', icon: 'users' },
     { id: 'roles', label: 'Roles', icon: 'shield' },
     { id: 'properties', label: 'Properties', icon: 'home' },
+    { id: 'service_templates', label: 'Service Templates', icon: 'workflow' },
     { id: 'job_templates', label: 'Job Templates', icon: 'clipboard-check' },
     { id: 'bom', label: 'BOM Templates', icon: 'clipboard-list' },
     { type: 'separator' },
@@ -37,6 +42,7 @@ const ROUTES = {
     'people': renderPeople,
     'roles': renderRoles,
     'bom': renderBOM,
+    'service_templates': renderServiceTemplates,
     'job_templates': renderJobTemplates,
     'service_opportunities': renderServiceOpportunities,
     'superuser': renderSuperuserDashboard
@@ -164,7 +170,17 @@ async function initApp() {
             loginForm.classList.add('hidden');
             forgotPasswordForm.classList.add('hidden');
             updatePasswordForm.classList.remove('hidden');
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        } else if (event === 'TOKEN_REFRESHED') {
+            // Token refresh - just update the user object silently, don't navigate
+            console.log("🔄 Token refreshed silently");
+            if (session && window.currentUser) {
+                // Session refreshed while we're already logged in - no action needed
+                // The Supabase client handles the new token automatically
+            } else if (session && !window.currentUser) {
+                // Edge case: session exists but currentUser lost - re-establish
+                await handleSession(session);
+            }
+        } else if (event === 'SIGNED_IN') {
             if (session) await handleSession(session);
         } else if (event === 'SIGNED_OUT') {
             window.currentUser = null;
@@ -378,29 +394,63 @@ function renderSidebar() {
     lucide.createIcons();
 }
 
+// Navigation Lock - prevents concurrent navigation race conditions
+let isNavigating = false;
+let navigationQueue = null;
+
 export async function navigate(viewId, paramsString = null) {
     console.log("🔄 Navigating to:", viewId);
 
-    // --- SESSION CHECK ---
-    // Before rendering, verify we have a valid session
-    const { data: { session }, error } = await supabase.auth.getSession();
-
-    if (error || !session) {
-        console.warn("⚠️ Session expired or invalid during navigation. Logging out.");
-        await window.logout();
+    // If already navigating, queue this request and abort
+    if (isNavigating) {
+        console.warn(`⏸️ Navigation in progress, queuing: ${viewId}`);
+        navigationQueue = { viewId, paramsString };
         return;
     }
 
-    // Ensure currentUser is populated
+    isNavigating = true;
+
+    try {
+        await performNavigation(viewId, paramsString);
+    } finally {
+        isNavigating = false;
+
+        // Process queued navigation if any
+        if (navigationQueue) {
+            const queued = navigationQueue;
+            navigationQueue = null;
+            console.log(`▶️ Processing queued navigation: ${queued.viewId}`);
+            navigate(queued.viewId, queued.paramsString);
+        }
+    }
+}
+
+async function performNavigation(viewId, paramsString) {
+    // --- SESSION CHECK ---
+    // Only check if we don't have a currentUser - the auth state handler maintains this
     if (!window.currentUser) {
-        console.log("⚠️ Session exists but currentUser missing. Reloading profile...");
-        await handleSession(session);
-        if (!window.currentUser) {
-            console.error("❌ Failed to load profile. Logging out.");
+        console.log("   ⏳ No currentUser, checking session...");
+        try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error || !session) {
+                console.warn("⚠️ No session, redirecting to login.");
+                await window.logout();
+                return;
+            }
+            // Try to establish currentUser
+            await handleSession(session);
+            if (!window.currentUser) {
+                console.error("❌ Failed to load profile. Logging out.");
+                await window.logout();
+                return;
+            }
+        } catch (e) {
+            console.error("❌ Session check error:", e.message);
             await window.logout();
             return;
         }
     }
+    console.log("   ✓ User authenticated:", window.currentUser.email);
 
 
     // Update Hash if not already set (to avoid loop)
@@ -442,6 +492,7 @@ export async function navigate(viewId, paramsString = null) {
     }
 
     // 3. Render
+    console.log("   ⏳ Rendering view...");
     try {
         await new Promise(r => setTimeout(r, 0));
         container.innerHTML = '';
@@ -472,3 +523,4 @@ export async function navigate(viewId, paramsString = null) {
 }
 
 window.navigate = navigate;
+

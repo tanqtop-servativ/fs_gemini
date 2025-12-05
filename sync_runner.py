@@ -60,11 +60,13 @@ def fetch_and_parse():
                 print(f"   found {len(events_payload)} events. Syncing...")
                 
                 # CHANGED: We pass feed_id now
-                cur.execute("CALL sync_ical_data(%s, %s)", (feed_id, json.dumps(events_payload)))
+                # Use SELECT because sync_ical_data is a FUNCTION, not a PROCEDURE
+                cur.execute("SELECT sync_ical_data(%s, %s)", (feed_id, json.dumps(events_payload)))
                 conn.commit() 
                 print("   ✅ Synced.")
 
             except Exception as e:
+                conn.rollback() # Reset transaction so next feed can be processed
                 print(f"   ❌ Error fetching feed: {e}")
 
     except Exception as e:

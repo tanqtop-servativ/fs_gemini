@@ -61,6 +61,7 @@ async function loadOppTable() {
         .order('created_at', { ascending: false });
 
     const tbody = document.getElementById('opp-body');
+    if (!tbody) return; // Exit if not on the view
 
     if (error) return tbody.innerHTML = `<tr><td colspan="5" class="text-red-500 px-6 py-4">Error: ${error.message}</td></tr>`;
     if (!opps || !opps.length) return tbody.innerHTML = `<tr><td colspan="5" class="text-center px-6 py-8 text-gray-400">No opportunities found.</td></tr>`;
@@ -143,37 +144,55 @@ async function generateWorkflow(oppId) {
 }
 
 // --- MODAL ---
-async function openEditOppModal(opp) {
+export async function openEditOppModal(opp = null, defaults = {}) {
+    // Import dynamically to avoid circular deps if any, or ensuring we have the latest
+    const { spawnModal } = await import('../modal_utils.js');
     const tenantId = getTenantId();
-    const container = document.getElementById('modal-container');
 
     // Fetch Properties & Templates
     const { data: properties } = await supabase.from('properties').select('id, name').eq('tenant_id', tenantId);
     const { data: templates } = await supabase.from('service_templates').select('id, name').eq('tenant_id', tenantId);
 
-    const propOptions = properties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    const tempOptions = templates.map(t => `<option value="${t.id}" ${opp && opp.service_template_id === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
+    // Determine initial values
+    const initialPropId = opp?.property_id || defaults.property_id || '';
+    const initialDate = opp?.due_date ? opp.due_date.split('T')[0] : (defaults.due_date || '');
 
-    container.innerHTML = `
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    const propOptions = properties.map(p => `<option value="${p.id}" ${p.id === initialPropId ? 'selected' : ''}>${p.name}</option>`).join('');
+    const tempOptions = templates.map(t => `<option value="${t.id}" ${opp && opp.service_template_id === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
+    const isEdit = opp && opp.id;
+    const uniqueId = Date.now(); // Unique ID for inputs in this specific modal instance
+
+    const html = `
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h3 class="font-bold text-lg mb-4">${opp ? 'Edit' : 'New'} Service Opportunity</h3>
+            <h3 class="font-bold text-lg mb-4">${isEdit ? 'Edit' : 'New'} Service Opportunity</h3>
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property</label>
-                    <select id="sel-property" class="w-full border p-2 rounded bg-white" ${opp ? 'disabled' : ''}>
+                    ${(defaults.lock_property && initialPropId) ? (() => {
+            const pName = properties.find(p => p.id == initialPropId)?.name || 'Unknown Property';
+            return `
+                        <div class="w-full border p-2 rounded bg-gray-50 text-gray-600 text-sm font-medium flex items-center justify-between">
+                            <span>${pName}</span>
+                            <i data-lucide="lock" class="w-3 h-3 text-gray-400"></i>
+                        </div>
+                        <input type="hidden" id="sel-property-${uniqueId}" value="${initialPropId}">
+                        `;
+        })() : `
+                    <select id="sel-property-${uniqueId}" class="w-full border p-2 rounded bg-white" ${isEdit ? 'disabled' : ''}>
                         ${propOptions}
                     </select>
+                    `}
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Service Template</label>
-                    <select id="sel-template" class="w-full border p-2 rounded bg-white">
+                    <select id="sel-template-${uniqueId}" class="w-full border p-2 rounded bg-white">
                         ${tempOptions}
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Source</label>
-                    <select id="sel-source" class="w-full border p-2 rounded bg-white">
+                    <select id="sel-source-${uniqueId}" class="w-full border p-2 rounded bg-white">
                         <option value="Manual" ${opp && opp.trigger_source === 'Manual' ? 'selected' : ''}>Manual Entry</option>
                         <option value="Phone" ${opp && opp.trigger_source === 'Phone' ? 'selected' : ''}>Phone Call</option>
                         <option value="Email" ${opp && opp.trigger_source === 'Email' ? 'selected' : ''}>Email Request</option>
@@ -183,80 +202,68 @@ async function openEditOppModal(opp) {
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Due Date</label>
-                    <input type="date" id="inp-date" class="w-full border p-2 rounded" value="${opp && opp.due_date ? opp.due_date.split('T')[0] : ''}">
+                    <input type="date" id="inp-date-${uniqueId}" class="w-full border p-2 rounded" value="${initialDate}">
                 </div>
             </div>
             <div class="flex justify-between mt-6">
-                ${opp ? `<button id="btn-delete" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded font-medium">Delete</button>` : '<div></div>'}
+                ${isEdit ? `<button id="btn-delete-${uniqueId}" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded font-medium">Delete</button>` : '<div></div>'}
                 <div class="flex gap-2">
-                    <button id="btn-cancel" class="px-4 py-2 hover:bg-gray-100 rounded">Cancel</button>
-                    <button id="btn-save" class="bg-black text-white px-4 py-2 rounded">${opp ? 'Save Changes' : 'Create'}</button>
+                    <button id="btn-cancel-${uniqueId}" class="px-4 py-2 hover:bg-gray-100 rounded">Cancel</button>
+                    <button id="btn-save-${uniqueId}" class="bg-black text-white px-4 py-2 rounded">${isEdit ? 'Save Changes' : 'Create'}</button>
                 </div>
             </div>
         </div>
     </div>`;
 
-    if (opp) {
-        document.getElementById('sel-property').value = opp.property_id;
-    }
+    const { container, attemptClose, close } = spawnModal(html);
 
-    const safeClose = setupModalGuard('modal-container', () => { container.innerHTML = ''; });
-    document.getElementById('btn-cancel').onclick = safeClose;
+    // Bind Actions
+    container.querySelector(`#btn-cancel-${uniqueId}`).onclick = attemptClose;
 
-    if (opp) {
-        document.getElementById('btn-delete').onclick = async () => {
+    if (isEdit) {
+        const delBtn = container.querySelector(`#btn-delete-${uniqueId}`);
+        if (delBtn) delBtn.onclick = async () => {
             if (!confirm("Are you sure you want to delete this opportunity?")) return;
-
-            const { error } = await supabase
-                .from('service_opportunities')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('id', opp.id);
-
-            if (error) {
-                alert("Error deleting: " + error.message);
-            } else {
-                container.innerHTML = '';
-                loadOppTable();
-            }
+            const { error } = await supabase.from('service_opportunities').update({ deleted_at: new Date().toISOString() }).eq('id', opp.id);
+            if (error) alert("Error deleting: " + error.message);
+            else { close(); if (typeof loadOppTable === 'function') loadOppTable(); else window.location.reload(); }
         };
     }
 
-    document.getElementById('btn-save').onclick = async () => {
-        const propId = document.getElementById('sel-property').value;
-        const tempId = document.getElementById('sel-template').value;
-        const source = document.getElementById('sel-source').value;
-        const date = document.getElementById('inp-date').value;
+    container.querySelector(`#btn-save-${uniqueId}`).onclick = async () => {
+        const propEl = container.querySelector(`#sel-property-${uniqueId}`);
+        const tempEl = container.querySelector(`#sel-template-${uniqueId}`);
 
-        if (!propId || !tempId) return alert("Please select Property and Template");
+        const propId = propEl ? propEl.value : null;
+        let tempId = tempEl ? tempEl.value : null;
+        const source = container.querySelector(`#sel-source-${uniqueId}`).value;
+        const date = container.querySelector(`#inp-date-${uniqueId}`).value;
+
+
+
+        if (!propId) return alert("Please select Property");
+
+        // allow empty/null tempId
+        if (tempId === "") tempId = null;
+
+        // Derive Title
+        let title = "New Service Opportunity";
+        if (tempId) {
+            const t = templates.find(tpl => tpl.id === tempId);
+            if (t) title = t.name;
+        }
 
         let error;
-        if (opp) {
-            // Update
-            const { error: err } = await supabase.from('service_opportunities').update({
-                service_template_id: tempId,
-                trigger_source: source,
-                due_date: date || null
-            }).eq('id', opp.id);
+        if (isEdit) {
+            const { error: err } = await supabase.from('service_opportunities').update({ service_template_id: tempId, trigger_source: source, due_date: date || null }).eq('id', opp.id);
             error = err;
         } else {
-            // Create
-            const { error: err } = await supabase.from('service_opportunities').insert({
-                tenant_id: tenantId,
-                property_id: propId,
-                service_template_id: tempId,
-                trigger_source: source,
-                due_date: date || null,
-                status: 'Pending'
-            });
+            const { error: err } = await supabase.from('service_opportunities').insert({ tenant_id: tenantId, property_id: propId, service_template_id: tempId, trigger_source: source, due_date: date || null, status: 'Pending', title: title });
             error = err;
         }
 
-        if (error) {
-            alert("Error: " + error.message);
-        } else {
-            container.innerHTML = '';
-            loadOppTable();
-        }
+        if (error) alert("Error: " + error.message);
+        else { close(); if (typeof loadOppTable === 'function') loadOppTable(); }
     };
 }
 

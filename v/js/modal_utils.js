@@ -1,12 +1,52 @@
+let modalZIndexBase = 50;
+
+/**
+ * Creates a new stacked modal layer.
+ * @param {string} htmlContent - THe innerHTML for the modal.
+ * @param {Function} [onClose] - Optional callback when modal closes.
+ * @returns {Object} { container: HTMLElement, close: Function }
+ */
+export function spawnModal(htmlContent, onClose) {
+    modalZIndexBase += 10;
+    const currentZ = modalZIndexBase;
+
+    const container = document.createElement('div');
+    container.id = `modal-layer-${Date.now()}`;
+    container.className = 'fixed inset-0 pointer-events-auto'; // Layout wrapper
+    container.style.zIndex = currentZ;
+    container.innerHTML = htmlContent;
+
+    document.body.appendChild(container);
+    lucide.createIcons();
+
+    const close = () => {
+        container.remove();
+        modalZIndexBase -= 10;
+        if (onClose) onClose();
+    };
+
+    // Auto-setup guard for this container
+    // passing the close function to the guard so it can trigger it
+    const attemptClose = setupModalGuard(container, close);
+
+    return { container, close, attemptClose };
+}
+
 /**
  * Attaches "Click Outside" and "Dirty Check" logic to a modal.
  * 
- * @param {string} containerId - The ID of the modal wrapper (usually 'modal-container')
- * @param {Function} closeCallback - The function to run to actually close the modal (e.g., clearing innerHTML)
+ * @param {string|HTMLElement} containerOrId - The modal wrapper ID or Element
+ * @param {Function} closeCallback - The function to run to actually close the modal
  */
-export function setupModalGuard(containerId, closeCallback) {
-    const container = document.getElementById(containerId);
+export function setupModalGuard(containerOrId, closeCallback) {
+    const container = typeof containerOrId === 'string'
+        ? document.getElementById(containerOrId)
+        : containerOrId;
+
+    if (!container) return () => { };
+
     const backdrop = container.firstElementChild; // The fixed div with bg-black/50
+
 
     if (!backdrop) return;
 
