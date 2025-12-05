@@ -337,7 +337,7 @@ export async function renderJobTemplates(container) {
         };
 
         modal.innerHTML = `
-        < div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" >
+            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                 <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
                     <h2 class="text-xl font-bold text-slate-800">${isEdit ? 'Edit Job Template' : 'New Job Template'}</h2>
@@ -393,7 +393,7 @@ export async function renderJobTemplates(container) {
                     </div>
                 </div>
             </div>
-            </div >
+            </div>
         `;
 
         renderTasks();
