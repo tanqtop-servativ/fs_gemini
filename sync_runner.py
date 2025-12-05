@@ -4,9 +4,16 @@ import requests
 from ics import Calendar
 import json
 import re
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- CONFIGURATION ---
-DB_CONNECTION_STRING = "postgresql://postgres:z5yvNT+Qkya6L5tJ8nTXyWGy<W7h_VKugE}@db.bittvioqzhfqfsdbuxvd.supabase.co:5432/postgres"
+DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
+
+if not DB_CONNECTION_STRING:
+    raise ValueError("DB_CONNECTION_STRING not found in environment variables.")
 
 def fetch_and_parse():
     conn = None
