@@ -145,7 +145,7 @@ export async function renderJobTemplates(container) {
         `}).join('') : '<div class="text-gray-400 text-sm italic p-4 text-center">No tasks defined.</div>';
 
         modal.innerHTML = `
-        < div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" >
+            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div class="p-6 border-b border-gray-100 flex justify-between items-start bg-slate-50 rounded-t-xl">
                     <div>
@@ -178,7 +178,7 @@ export async function renderJobTemplates(container) {
                     ${!isDeleted ? `<button id="btn-edit-tmpl" class="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit Template</button>` : ''}
                 </div>
             </div>
-            </div >
+            </div>
         `;
 
         document.getElementById('btn-close-modal').onclick = () => modal.innerHTML = '';
