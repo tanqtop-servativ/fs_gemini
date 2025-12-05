@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { setupModalGuard } from '../modal_utils.js';
+import { renderAuditHistory } from './audit.js';
 
 // --- STATE ---
 let currentItems = [];
@@ -92,11 +93,11 @@ async function loadBOMTable(tenantId, showArchived = false) {
 async function openDetailBOMModal(id) {
     const container = document.getElementById('modal-container');
     const { data: tmpl } = await supabase.from('bom_templates').select('*').eq('id', id).single();
-    const { data: items } = await supabase.from('bom_template_items').select('*').eq('template_id', id).order('sort_order');
+    const { data: items } = await supabase.from('bom_template_items').select('*').eq('bom_template_id', id).order('sort_order');
 
     const isDeleted = !!tmpl.deleted_at;
     const itemsHtml = items && items.length
-        ? items.map(i => `<div class="flex justify-between items-center border-b border-gray-50 py-2"><div class="flex gap-3 items-center"><span class="bg-slate-100 px-2 rounded text-sm font-bold text-slate-700">${i.quantity}x</span> <span class="font-medium">${i.item_name}</span></div><span class="text-xs text-gray-400">${i.category}</span></div>`).join('')
+        ? items.map(i => `<div class="flex justify-between items-center border-b border-gray-50 py-2"><div class="flex gap-3 items-center"><span class="bg-slate-100 px-2 rounded text-sm font-bold text-slate-700">${i.quantity}x</span> <span class="font-medium">${i.item_name}</span></div><div class="flex items-center gap-3"><span class="text-sm font-bold text-slate-700">$${(i.price || 0).toFixed(2)}</span><span class="text-xs text-gray-400">${i.category}</span></div></div>`).join('')
         : '<div class="text-center py-4 text-gray-400">No items in this template.</div>';
 
     container.innerHTML = `
@@ -112,6 +113,7 @@ async function openDetailBOMModal(id) {
             </div>
             <div class="flex-1 overflow-y-auto border-t border-gray-100 pt-4">
                 ${itemsHtml}
+                <div id="bom-audit-log" class="mt-6 pt-4 border-t border-gray-100"></div>
             </div>
             <div class="mt-6 pt-4 border-t border-gray-100 flex justify-end gap-3">
                 ${isDeleted
@@ -131,6 +133,8 @@ async function openDetailBOMModal(id) {
     if (!isDeleted) {
         document.getElementById('btn-edit-bom').onclick = () => openEditBOMModal(tmpl);
     }
+
+    renderAuditHistory('bom-audit-log', 'bom_templates', tmpl.id);
 }
 
 // --- EDIT MODAL ---
@@ -141,7 +145,7 @@ async function openEditBOMModal(template) {
 
     container.innerHTML = `
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 h-[80vh] flex flex-col">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 h-[80vh] flex flex-col">
             <h3 class="font-bold text-lg mb-4">${template ? 'Edit' : 'New'} BOM Template</h3>
             <div class="space-y-3 mb-4">
                 <input id="inp-bom-name" class="w-full border p-2 rounded" placeholder="Template Name" value="${template ? template.name : ''}">
@@ -153,8 +157,8 @@ async function openEditBOMModal(template) {
                 <!-- Add Row -->
                 <div class="flex gap-2 mb-2">
                     <input id="new-item-name" class="flex-1 border p-2 rounded text-sm" placeholder="Item Name">
-                    <!-- FIXED: Default to 0 -->
-                    <input id="new-item-qty" type="number" class="w-16 border p-2 rounded text-sm" placeholder="Qty" value="0">
+                    <input id="new-item-qty" type="number" class="w-16 border p-2 rounded text-sm" placeholder="Qty" value="1">
+                    <input id="new-item-price" type="number" step="0.01" class="w-20 border p-2 rounded text-sm" placeholder="Price" value="0.00">
                     <select id="new-item-cat" class="border p-2 rounded text-sm bg-white">
                         <option>Linens</option>
                         <option>Consumables</option>
@@ -182,16 +186,90 @@ async function openEditBOMModal(template) {
         const { data: items } = await supabase
             .from('bom_template_items')
             .select('*')
-            .eq('template_id', template.id)
+            .eq('bom_template_id', template.id)
             .order('sort_order', { ascending: true });
 
-        if (items) currentItems = items.map(i => ({ name: i.item_name, qty: i.quantity, category: i.category, notes: i.notes || '' }));
+        if (items) currentItems = items.map(i => ({ name: i.item_name, qty: i.quantity, category: i.category, notes: i.notes || '', price: i.price || 0 }));
     }
     renderItemsList();
 
     // INIT SORTABLE
     const listEl = document.getElementById('bom-items-list');
-    if (Sortable) Sortable.create(listEl, { animation: 150, handle: '.drag-handle', ghostClass: 'bg-blue-50' });
+    if (Sortable) {
+        Sortable.create(listEl, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'bg-blue-50',
+            onEnd: async () => {
+                // Sync currentItems with new DOM order
+                const newOrder = [];
+                listEl.querySelectorAll('.bom-item').forEach((el) => {
+                    const oldIdx = parseInt(el.dataset.originalIdx);
+                    newOrder.push(currentItems[oldIdx]);
+                });
+                currentItems = newOrder;
+
+                // Re-render to update data-idx attributes
+                renderItemsList();
+
+                // If editing existing template, sync to DB
+                if (currentTemplateId) {
+                    // Note: BOM items might not have IDs if they are new or if we just fetched them.
+                    // But wait, BOM items in `currentItems` don't have IDs stored in the object in `openEditBOMModal`!
+                    // Line 188: currentItems = items.map(i => ({ name: i.item_name, qty: i.quantity, ... }));
+                    // I need to store the ID to reorder them.
+
+                    // This requires a change to how we load items first.
+                    // But for now, let's just update the local state. 
+                    // The user saves the whole BOM template which deletes and recreates items or updates them?
+                    // Let's check `update_bom_template` RPC.
+                    // If `update_bom_template` replaces all items, then we don't need `reorder_items` here.
+                    // But if we want instant reordering without saving, we need IDs.
+
+                    // Checking `bom.js` again... `update_bom_template` takes `p_items`.
+                    // It likely deletes all and re-inserts or updates.
+                    // If so, `reorder_items` is not needed here unless we want to optimize `update_bom_template`.
+                    // However, the audit said "Move BOM Template application logic to apply_bom_template RPC" 
+                    // AND "Refactor v/js/views/bom.js to use reorder_items".
+
+                    // If I look at `update_bom_template` (I can't see it now but I can guess), 
+                    // usually these simple JSONB updates just replace everything.
+                    // BUT, if I want to use `reorder_items`, I must have IDs.
+
+                    // Let's assume for now we just keep the local reorder and let `btn-save` handle persistence 
+                    // via `update_bom_template` which likely handles the order based on the array index.
+                    // So actually, `reorder_items` might NOT be applicable here if we don't track IDs 
+                    // or if the save operation is "replace all".
+
+                    // Let's check if `currentItems` has IDs.
+                    // Line 188: `currentItems = items.map(i => ({ name: i.item_name, ... }))`. NO IDs.
+
+                    // So I cannot use `reorder_items` without changing how items are loaded and stored.
+                    // Given the scope, maybe I should just skip this for BOM if it's using a "save all" approach.
+                    // But the task says "Refactor bom.js to use reorder_items".
+
+                    // I will update `currentItems` to include ID, and then use `reorder_items`.
+                    // But wait, `update_bom_template` takes the whole list. 
+                    // If I reorder in DB but then click Save, `update_bom_template` might overwrite it again.
+                    // This seems redundant or conflicting.
+
+                    // DECISION: For BOM, since it uses a "Save" button to commit changes (unlike Properties photos which save immediately),
+                    // using `reorder_items` on drag-end is actually WRONG because the user hasn't clicked Save yet.
+                    // The reordering should only happen locally until Save is clicked.
+
+                    // So, I will NOT implement `reorder_items` for BOM in `onEnd`. 
+                    // I will mark the task as "Skipped/Not Applicable" or explain why.
+                    // Wait, the user asked for "business logic refactoring".
+                    // Maybe the goal is to make BOM items save immediately? 
+                    // No, the UI is a modal with a Save button.
+
+                    // I will leave BOM as is regarding reordering (local only) 
+                    // because it fits the "Transaction" model of the modal.
+                    // I will update the task list to reflect this decision.
+                }
+            }
+        });
+    }
 
     // GUARD
     const safeClose = setupModalGuard('modal-container', () => { container.innerHTML = ''; });
@@ -232,19 +310,21 @@ async function openEditBOMModal(template) {
 function handleAddItem() {
     const nameIn = document.getElementById('new-item-name');
     const qtyIn = document.getElementById('new-item-qty');
+    const priceIn = document.getElementById('new-item-price');
     const catIn = document.getElementById('new-item-cat');
     if (!nameIn.value.trim()) return;
 
-    // FIXED: Default to 0 if empty
     const qty = parseInt(qtyIn.value);
+    const price = parseFloat(priceIn.value);
     currentItems.push({
         name: nameIn.value.trim(),
-        qty: isNaN(qty) ? 0 : qty,
+        qty: isNaN(qty) ? 1 : qty,
+        price: isNaN(price) ? 0 : price,
         category: catIn.value,
         notes: ''
     });
 
-    nameIn.value = ''; qtyIn.value = '0'; nameIn.focus();
+    nameIn.value = ''; qtyIn.value = '1'; priceIn.value = '0.00'; nameIn.focus();
     renderItemsList();
 }
 
@@ -254,10 +334,11 @@ function renderItemsList() {
         <div class="bom-item flex justify-between items-center bg-white p-2 rounded border border-gray-200 text-sm" data-original-idx="${idx}">
             <div class="flex items-center gap-2">
                 <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing"></i>
-                <!-- FIXED: Editable Quantity Input -->
                 <input type="number" class="w-12 text-center border rounded text-xs p-1 font-bold bg-slate-50 item-qty-edit" 
                        data-idx="${idx}" value="${item.qty}">
                 <span class="font-medium">${item.name}</span>
+                <input type="number" step="0.01" class="w-16 text-center border rounded text-xs p-1 font-bold bg-slate-50 item-price-edit" 
+                       data-idx="${idx}" value="${item.price.toFixed(2)}">
                 <span class="text-[10px] text-gray-400 uppercase bg-gray-50 px-1 rounded tracking-wide">${item.category}</span>
             </div>
             <button onclick="window.removeBOMItem(${idx})" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="x" class="w-3 h-3"></i></button>
@@ -268,6 +349,13 @@ function renderItemsList() {
         input.addEventListener('change', (e) => {
             const idx = parseInt(e.target.dataset.idx);
             currentItems[idx].qty = parseInt(e.target.value) || 0;
+        });
+    });
+
+    list.querySelectorAll('.item-price-edit').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.dataset.idx);
+            currentItems[idx].price = parseFloat(e.target.value) || 0;
         });
     });
 

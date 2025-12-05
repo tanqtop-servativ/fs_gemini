@@ -6,23 +6,21 @@ load_dotenv()
 
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
 
-def inspect_rpc():
+def check_dupes():
     try:
         conn = psycopg2.connect(DB_CONNECTION_STRING)
         cur = conn.cursor()
         
-        query_def = """
-        SELECT pg_get_functiondef(oid)
+        query = """
+        SELECT oid, proname, proargtypes::regtype[]
         FROM pg_proc
         WHERE proname = 'create_job_template';
         """
-        cur.execute(query_def)
-        result_def = cur.fetchone()
-        
-        if result_def:
-            print(f"\nFull definition of create_job_template:\n{result_def[0]}")
-        else:
-            print("\nFunction create_job_template not found.")
+        cur.execute(query)
+        results = cur.fetchall()
+        print("Functions found:")
+        for row in results:
+            print(f" - OID: {row[0]}, Name: {row[1]}, Args: {row[2]}")
 
     except Exception as e:
         print(f"Error: {e}")
@@ -31,4 +29,4 @@ def inspect_rpc():
             conn.close()
 
 if __name__ == "__main__":
-    inspect_rpc()
+    check_dupes()

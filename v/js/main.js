@@ -164,8 +164,8 @@ async function initApp() {
             loginForm.classList.add('hidden');
             forgotPasswordForm.classList.add('hidden');
             updatePasswordForm.classList.remove('hidden');
-        } else if (event === 'SIGNED_IN') {
-            await handleSession(session);
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (session) await handleSession(session);
         } else if (event === 'SIGNED_OUT') {
             window.currentUser = null;
             renderLogin();
@@ -190,6 +190,11 @@ async function initApp() {
 }
 
 async function handleSession(session) {
+    if (!session || !session.user) {
+        console.warn("handleSession called without valid session/user");
+        return;
+    }
+
     // Fetch profile data (tenant_id, role, etc.)
     // We need to query our 'public.profiles' table
     const { data: profile, error } = await supabase
@@ -375,6 +380,28 @@ function renderSidebar() {
 
 export async function navigate(viewId, paramsString = null) {
     console.log("🔄 Navigating to:", viewId);
+
+    // --- SESSION CHECK ---
+    // Before rendering, verify we have a valid session
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
+        console.warn("⚠️ Session expired or invalid during navigation. Logging out.");
+        await window.logout();
+        return;
+    }
+
+    // Ensure currentUser is populated
+    if (!window.currentUser) {
+        console.log("⚠️ Session exists but currentUser missing. Reloading profile...");
+        await handleSession(session);
+        if (!window.currentUser) {
+            console.error("❌ Failed to load profile. Logging out.");
+            await window.logout();
+            return;
+        }
+    }
+
 
     // Update Hash if not already set (to avoid loop)
     const currentHash = window.location.hash.substring(1).split('?')[0];

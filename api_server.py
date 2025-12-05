@@ -153,6 +153,9 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(404)
 
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
+
 print(f"🔌 API Server running on port {PORT}")
-with socketserver.TCPServer(("", PORT), AdminRequestHandler) as httpd:
+with ThreadedTCPServer(("", PORT), AdminRequestHandler) as httpd:
     httpd.serve_forever()

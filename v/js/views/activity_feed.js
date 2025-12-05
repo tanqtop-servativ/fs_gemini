@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { setupModalGuard } from '../modal_utils.js';
+import { copyToClipboard } from '../utils.js';
 
 export async function renderActivityFeed(container) {
     // 1. Render Skeleton
@@ -224,7 +225,7 @@ function renderItems(items, container) {
         }
 
         return `
-        <div class="group flex items-start gap-4 p-4 ${rowClass} hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+        <div onclick="window.viewActivityDetail('${item.event_id}')" class="group flex items-start gap-4 p-4 ${rowClass} hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 cursor-pointer relative">
             <div class="flex-shrink-0 mt-1 ${iconColor}">
                 <i data-lucide="${icon}" class="w-5 h-5"></i>
             </div>
@@ -240,9 +241,14 @@ function renderItems(items, container) {
                 </div>
             </div>
 
-            <button onclick="window.viewActivityDetail('${item.event_id}')" class="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full">
-                <i data-lucide="eye" class="w-4 h-4"></i>
-            </button>
+            <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onclick="event.stopPropagation(); window.copyActivityItem('${item.event_id}')" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full" title="Copy Details">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+                <button onclick="event.stopPropagation(); window.viewActivityDetail('${item.event_id}')" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full" title="View Details">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+            </div>
         </div>`;
     }).join('');
 
@@ -252,6 +258,17 @@ function renderItems(items, container) {
     window.viewActivityDetail = (id) => {
         const item = items.find(i => i.event_id === id);
         if (item) openDetailModal(item);
+    };
+
+    window.copyActivityItem = (id) => {
+        const item = items.find(i => i.event_id === id);
+        if (item) {
+            let text = `Summary: ${item.summary}\nTime: ${new Date(item.timestamp).toLocaleString()}\nCategory: ${item.category}\nActor: ${item.actor_email || 'System'}\n`;
+            if (item.details) {
+                text += `Details:\n${JSON.stringify(item.details, null, 2)}`;
+            }
+            copyToClipboard(text);
+        }
     };
 }
 
@@ -306,9 +323,14 @@ function openDetailModal(item) {
                     <h3 class="font-bold text-lg text-slate-800">Event Details</h3>
                     <div class="text-xs text-slate-500">${new Date(item.timestamp).toLocaleString()}</div>
                 </div>
-                <button id="btn-close-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                     <button onclick="window.copyActivityItem('${item.event_id}')" class="text-gray-400 hover:text-indigo-600 transition-colors p-1" title="Copy Details">
+                        <i data-lucide="copy" class="w-5 h-5"></i>
+                    </button>
+                    <button id="btn-close-modal" class="text-gray-400 hover:text-gray-600 transition-colors p-1">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
             </div>
             <div class="p-6">
                 ${contentHtml}

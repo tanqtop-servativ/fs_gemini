@@ -1,4 +1,6 @@
 import { supabase } from '../supabase.js';
+import { setupModalGuard } from '../modal_utils.js';
+import { renderAuditHistory } from './audit.js';
 import { getTenantId } from '../utils.js';
 
 export async function renderJobTemplates(container) {
@@ -27,60 +29,148 @@ export async function renderJobTemplates(container) {
     // --- RENDER LIST ---
     const renderList = (showArchived) => {
         container.innerHTML = `
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h1 class="text-2xl font-bold text-slate-800">Job Templates</h1>
-                    <div class="flex items-center gap-4">
-                        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                            <input type="checkbox" id="chk-show-archived" class="rounded border-gray-300 text-black focus:ring-0" ${showArchived ? 'checked' : ''}>
-                            Show Archived
-                        </label>
-                        <button id="btn-new-tmpl" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 flex items-center shadow-lg hover:shadow-xl transition-all">
-                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Template
-                        </button>
-                    </div>
+            <div class="mb-6 flex justify-between items-center">
+                <div><h1 class="text-2xl font-bold text-slate-900">Job Templates</h1><p class="text-gray-500">Manage standard job workflows</p></div>
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                        <input type="checkbox" id="chk-show-archived" class="rounded border-gray-300 text-black focus:ring-0" ${showArchived ? 'checked' : ''}>
+                        Show Archived
+                    </label>
+                    <button id="btn-new-tmpl" class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-gray-800 transition">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i> New Template
+                    </button>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tmpl-grid"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold">
+                            <th class="px-6 py-4">Template Name</th>
+                            <th class="px-6 py-4">Description</th>
+                            <th class="px-6 py-4">Tasks</th>
+                            <th class="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tmpl-body"></tbody>
+                </table>
             </div>
             <div id="modal-container"></div>
         `;
 
-        const grid = document.getElementById('tmpl-grid');
+        const tbody = document.getElementById('tmpl-body');
         if (templates.length === 0) {
-            grid.innerHTML = `<div class="col-span-full text-center text-gray-400 py-10">No templates found. Create one to get started.</div>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">No templates found. Create one to get started.</td></tr>`;
         } else {
-            templates.forEach(t => {
+            tbody.innerHTML = templates.map(t => {
                 const isDeleted = !!t.deleted_at;
-                const card = document.createElement('div');
-                card.className = `bg-white rounded-xl shadow-sm border border-slate-100 p-4 hover:shadow-md transition-shadow cursor-pointer group relative ${isDeleted ? 'opacity-60 bg-gray-50' : ''}`;
-                card.onclick = () => openModal(t);
-
                 const taskCount = t.job_template_tasks ? t.job_template_tasks.length : 0;
+                const rowClass = isDeleted ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50';
+                const nameClass = isDeleted ? 'line-through text-gray-500' : 'text-slate-900';
 
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <h3 class="font-bold text-lg text-slate-800 ${isDeleted ? 'line-through decoration-slate-400' : ''}">${t.name}</h3>
-                        <div class="flex gap-2">
-                            ${isDeleted ? '<span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full font-bold uppercase">Archived</span>' : ''}
-                            <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full font-bold">${taskCount} Tasks</span>
-                        </div>
-                    </div>
-                    <p class="text-sm text-gray-500 line-clamp-2 mb-4 h-10">${t.description || 'No description'}</p>
-                    <div class="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button class="text-xs font-bold text-blue-600 hover:text-blue-800 uppercase">Edit Template</button>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
+                return `
+                <tr class="border-b border-gray-100 ${rowClass} group cursor-pointer" onclick="window.viewTmpl('${t.id}')">
+                    <td class="px-6 py-4 font-bold ${nameClass}">
+                        ${t.name}
+                        ${isDeleted ? '<span class="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded no-underline">ARCHIVED</span>' : ''}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-600 max-w-xs truncate">${t.description || '-'}</td>
+                    <td class="px-6 py-4">
+                        <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full font-bold">${taskCount} Tasks</span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button class="text-slate-400 hover:text-blue-600 p-2" onclick="event.stopPropagation(); window.viewTmpl('${t.id}')"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
         }
 
-        document.getElementById('btn-new-tmpl').onclick = () => openModal(null);
+        window.viewTmpl = (id) => {
+            const t = templates.find(x => x.id === id);
+            if (t) openDetailModal(t);
+        };
+
+        window.editTmpl = (id) => {
+            const t = templates.find(x => x.id === id);
+            if (t) openEditModal(t);
+        };
+
+        document.getElementById('btn-new-tmpl').onclick = () => openEditModal(null);
         document.getElementById('chk-show-archived').onchange = (e) => fetchTemplates(e.target.checked);
         lucide.createIcons();
     };
 
-    // --- MODAL ---
-    const openModal = (tmpl) => {
+    // --- DETAIL MODAL ---
+    const openDetailModal = (tmpl) => {
+        const isDeleted = !!tmpl.deleted_at;
+        const tasks = (tmpl.job_template_tasks || []).sort((a, b) => a.sort_order - b.sort_order);
+        const modal = document.getElementById('modal-container');
+
+        const taskListHTML = tasks.length > 0 ? tasks.map((t, idx) => `
+            <div class="flex gap-3 items-start p-3 border-b border-gray-100 last:border-0">
+                <div class="mt-1 text-slate-400 font-mono text-xs w-6">${idx + 1}.</div>
+                <div class="flex-1">
+                    <div class="font-bold text-sm text-slate-800">${t.title}</div>
+                    ${t.description ? `<div class="text-xs text-gray-500 mt-1">${t.description}</div>` : ''}
+                    <div class="flex gap-2 mt-2">
+                        ${t.is_required ? '<span class="text-[10px] font-bold uppercase text-red-500 bg-red-50 px-1.5 py-0.5 rounded">Required</span>' : ''}
+                        ${t.require_photo ? '<span class="text-[10px] font-bold uppercase text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Photo Req.</span>' : ''}
+                    </div>
+                </div>
+                ${t.title_es ? `
+                <div class="flex-1 border-l border-gray-100 pl-3">
+                    <div class="font-bold text-sm text-slate-600">${t.title_es}</div>
+                    ${t.description_es ? `<div class="text-xs text-gray-400 mt-1">${t.description_es}</div>` : ''}
+                </div>` : ''}
+            </div>
+        `).join('') : '<div class="text-gray-400 text-sm italic p-4 text-center">No tasks defined.</div>';
+
+        modal.innerHTML = `
+            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                    <div class="p-6 border-b border-gray-100 flex justify-between items-start bg-slate-50 rounded-t-xl">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                ${tmpl.name}
+                                ${isDeleted ? '<span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full font-bold uppercase">Archived</span>' : ''}
+                            </h2>
+                            ${tmpl.name_es ? `<p class="text-sm text-blue-600 font-medium mt-1">${tmpl.name_es}</p>` : ''}
+                        </div>
+                        <button id="btn-close-modal" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+                    </div>
+                    
+                    <div class="p-6 overflow-y-auto flex-1">
+                        <div class="mb-6">
+                            <h3 class="text-xs font-bold uppercase text-gray-500 mb-2">Description</h3>
+                            <p class="text-sm text-gray-700">${tmpl.description || 'No description provided.'}</p>
+                            ${tmpl.description_es ? `<p class="text-sm text-gray-500 mt-2 italic border-l-2 border-blue-200 pl-2">${tmpl.description_es}</p>` : ''}
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-bold uppercase text-gray-500 mb-2">Tasks (${tasks.length})</h3>
+                            <div class="bg-slate-50 rounded-lg border border-gray-200">
+                                ${taskListHTML}
+                            </div>
+                            <div id="job-audit-log" class="mt-6 pt-4 border-t border-gray-100"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-end gap-2">
+                        ${!isDeleted ? `<button id="btn-edit-tmpl" class="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 flex items-center"><i data-lucide="pencil" class="w-4 h-4 mr-2"></i> Edit Template</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('btn-close-modal').onclick = () => modal.innerHTML = '';
+        if (!isDeleted) {
+            document.getElementById('btn-edit-tmpl').onclick = () => openEditModal(tmpl);
+        }
+        renderAuditHistory('job-audit-log', 'job_templates', tmpl.id);
+        lucide.createIcons();
+    };
+
+    // --- EDIT MODAL ---
+    const openEditModal = (tmpl) => {
         const isEdit = !!tmpl;
         const isDeleted = tmpl && !!tmpl.deleted_at;
         let tasks = tmpl ? (tmpl.job_template_tasks || []).sort((a, b) => a.sort_order - b.sort_order) : [];
@@ -95,8 +185,11 @@ export async function renderJobTemplates(container) {
                 return;
             }
             list.innerHTML = tasks.map((t, idx) => `
-                <div class="flex gap-3 items-start bg-slate-50 p-3 rounded border border-slate-200 group">
-                    <div class="mt-1 text-slate-400 font-mono text-xs">${idx + 1}</div>
+                <div class="flex gap-3 items-start bg-slate-50 p-3 rounded border border-slate-200 group task-item" data-original-idx="${idx}">
+                    <div class="mt-1 flex flex-col items-center gap-2">
+                        <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing"></i>
+                        <div class="text-slate-400 font-mono text-xs">${idx + 1}</div>
+                    </div>
                     <div class="flex-1 space-y-3">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
@@ -133,6 +226,41 @@ export async function renderJobTemplates(container) {
             list.querySelectorAll('.task-req').forEach(el => el.onchange = (e) => tasks[el.dataset.idx].is_required = e.target.checked);
             list.querySelectorAll('.task-photo').forEach(el => el.onchange = (e) => tasks[el.dataset.idx].require_photo = e.target.checked);
             list.querySelectorAll('.btn-del-task').forEach(el => el.onclick = () => { tasks.splice(el.dataset.idx, 1); renderTasks(); });
+
+            // Init Sortable
+            if (Sortable) {
+                Sortable.create(list, {
+                    animation: 150,
+                    handle: '.drag-handle',
+                    ghostClass: 'bg-blue-50',
+                    onEnd: async () => {
+                        const newOrder = [];
+                        list.querySelectorAll('.task-item').forEach(el => {
+                            newOrder.push(tasks[parseInt(el.dataset.originalIdx)]);
+                        });
+                        tasks = newOrder;
+                        renderTasks();
+
+                        // If we are editing an existing template, sync order to DB immediately
+                        if (tmpl && tmpl.id) {
+                            const items = tasks.map((t, idx) => ({ id: t.id, order: idx }));
+                            // Filter out new tasks that don't have an ID yet
+                            const validItems = items.filter(i => i.id);
+
+                            if (validItems.length > 0) {
+                                const { error } = await supabase.rpc('reorder_items', {
+                                    p_table: 'job_template_tasks',
+                                    p_id_col: 'id',
+                                    p_order_col: 'sort_order',
+                                    p_items: validItems
+                                });
+                                if (error) console.error("Reorder failed:", error);
+                            }
+                        }
+                    }
+                });
+            }
+
             lucide.createIcons();
         };
 
@@ -140,7 +268,7 @@ export async function renderJobTemplates(container) {
             <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                 <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                     <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
-                        <h2 class="text-xl font-bold text-slate-800">${isEdit ? 'Edit Template' : 'New Template'}</h2>
+                        <h2 class="text-xl font-bold text-slate-800">${isEdit ? 'Edit Job Template' : 'New Job Template'}</h2>
                         <button id="btn-close-modal" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     
@@ -174,6 +302,9 @@ export async function renderJobTemplates(container) {
                                 <button id="btn-add-task" class="text-xs font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded hover:bg-blue-100 flex items-center">
                                     <i data-lucide="plus" class="w-3 h-3 mr-1"></i> Add Task
                                 </button>
+                                <button id="btn-library" class="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded hover:bg-slate-200 flex items-center ml-2">
+                                    <i data-lucide="book" class="w-3 h-3 mr-1"></i> Library
+                                </button>
                             </div>
                             <div id="task-list" class="space-y-3"></div>
                         </div>
@@ -202,6 +333,13 @@ export async function renderJobTemplates(container) {
         document.getElementById('btn-add-task').onclick = () => {
             tasks.push({ title: '', description: '', title_es: '', description_es: '', is_required: true, require_photo: false });
             renderTasks();
+        };
+
+        document.getElementById('btn-library').onclick = () => {
+            openLibraryModal((taskData) => {
+                tasks.push(taskData);
+                renderTasks();
+            });
         };
 
         if (isEdit) {
@@ -233,21 +371,28 @@ export async function renderJobTemplates(container) {
             if (tasks.some(t => !t.title.trim())) return alert("All tasks must have an English title");
             if (tasks.some(t => !t.title_es || !t.title_es.trim())) return alert("All tasks must have a Spanish title");
 
-            const payload = {
-                p_name: name,
-                p_description: desc,
-                p_name_es: nameEs,
-                p_description_es: descEs,
-                p_tasks: tasks,
-                p_tenant_id: tenantId
-            };
-
             let err;
             if (isEdit) {
-                const { error } = await supabase.rpc('update_job_template', { ...payload, p_id: tmpl.id });
+                const updatePayload = {
+                    p_id: tmpl.id,
+                    p_name: name,
+                    p_description: desc,
+                    p_name_es: nameEs,
+                    p_description_es: descEs,
+                    p_tasks: tasks
+                };
+                const { error } = await supabase.rpc('update_job_template', updatePayload);
                 err = error;
             } else {
-                const { error } = await supabase.rpc('create_job_template', payload);
+                const createPayload = {
+                    p_name: name,
+                    p_description: desc,
+                    p_name_es: nameEs,
+                    p_description_es: descEs,
+                    p_tasks: tasks,
+                    p_tenant_id: tenantId
+                };
+                const { error } = await supabase.rpc('create_job_template', createPayload);
                 err = error;
             }
 
@@ -262,4 +407,153 @@ export async function renderJobTemplates(container) {
     };
 
     fetchTemplates();
+}
+
+async function openLibraryModal(onSelect) {
+    const container = document.createElement('div');
+    container.id = 'library-modal';
+    document.body.appendChild(container);
+
+    const tenantId = getTenantId();
+    let libraryTasks = [];
+
+    const fetchLibrary = async () => {
+        const { data, error } = await supabase.from('task_library').select('*').eq('tenant_id', tenantId).order('title');
+        if (error) alert("Error fetching library: " + error.message);
+        else {
+            libraryTasks = data;
+            renderLibrary();
+        }
+    };
+
+    const renderLibrary = () => {
+        const listHtml = libraryTasks.length > 0 ? libraryTasks.map(t => `
+            <div class="flex justify-between items-start p-3 border-b border-gray-100 hover:bg-slate-50 group">
+                <div>
+                    <div class="font-bold text-sm text-slate-800">${t.title}</div>
+                    <div class="text-xs text-gray-500">${t.description || ''}</div>
+                    ${t.title_es ? `<div class="text-xs text-blue-500 mt-1">${t.title_es}</div>` : ''}
+                </div>
+                <button class="bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-3 py-1 rounded text-xs font-bold btn-use-task" data-id="${t.id}">
+                    Use
+                </button>
+            </div>
+        `).join('') : '<div class="text-center text-gray-400 py-8">Library is empty.</div>';
+
+        container.innerHTML = `
+            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+                    <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+                        <h3 class="font-bold text-slate-800">Task Library</h3>
+                        <button id="btn-close-lib" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div class="p-4 overflow-y-auto flex-1">
+                        <div class="mb-4">
+                            <input id="inp-search-lib" class="w-full border p-2 rounded text-sm" placeholder="Search tasks...">
+                        </div>
+                        <div id="lib-list" class="border rounded border-gray-100">
+                            ${listHtml}
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-between items-center">
+                         <span class="text-xs text-gray-400">Pro Tip: Standardize your tasks here.</span>
+                         <button id="btn-create-lib-task" class="text-blue-600 text-xs font-bold hover:underline">+ Create New Library Task</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        lucide.createIcons();
+
+        document.getElementById('btn-close-lib').onclick = close;
+        document.getElementById('btn-create-lib-task').onclick = () => openCreateLibTaskModal(fetchLibrary);
+
+        container.querySelectorAll('.btn-use-task').forEach(btn => {
+            btn.onclick = () => {
+                const task = libraryTasks.find(t => t.id === btn.dataset.id);
+                if (task) {
+                    onSelect({
+                        title: task.title,
+                        description: task.description,
+                        title_es: task.title_es,
+                        description_es: task.description_es,
+                        is_required: task.is_required,
+                        require_photo: task.require_photo
+                    });
+                    close();
+                }
+            };
+        });
+
+        // Simple Search
+        document.getElementById('inp-search-lib').onkeyup = (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = libraryTasks.filter(t =>
+                t.title.toLowerCase().includes(term) ||
+                (t.title_es && t.title_es.toLowerCase().includes(term))
+            );
+            // Re-render list only (simplified for now, full re-render is easier)
+            // Ideally we separate renderList from renderContainer, but this is fast enough.
+        };
+    };
+
+    const close = () => {
+        container.remove();
+    };
+
+    fetchLibrary();
+}
+
+async function openCreateLibTaskModal(onSuccess) {
+    // A small modal on top of library modal to create a new master task
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    container.innerHTML = `
+        <div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/20" id="overlay-create-lib"></div>
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10">
+                <h3 class="font-bold text-lg mb-4">New Library Task</h3>
+                <div class="space-y-3">
+                    <input id="lib-title" class="w-full border p-2 rounded text-sm" placeholder="Title (EN)">
+                    <input id="lib-title-es" class="w-full border p-2 rounded text-sm" placeholder="Title (ES)">
+                    <textarea id="lib-desc" class="w-full border p-2 rounded text-sm h-20 resize-none" placeholder="Description (EN)"></textarea>
+                    <textarea id="lib-desc-es" class="w-full border p-2 rounded text-sm h-20 resize-none" placeholder="Description (ES)"></textarea>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="lib-req"> Required</label>
+                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="lib-photo"> Photo Req.</label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button id="btn-cancel-lib-create" class="px-4 py-2 text-sm text-gray-600">Cancel</button>
+                    <button id="btn-save-lib-create" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold">Save to Library</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const close = () => container.remove();
+    document.getElementById('overlay-create-lib').onclick = close;
+    document.getElementById('btn-cancel-lib-create').onclick = close;
+
+    document.getElementById('btn-save-lib-create').onclick = async () => {
+        const title = document.getElementById('lib-title').value.trim();
+        if (!title) return alert("Title required");
+
+        const payload = {
+            tenant_id: getTenantId(),
+            title: title,
+            title_es: document.getElementById('lib-title-es').value.trim(),
+            description: document.getElementById('lib-desc').value.trim(),
+            description_es: document.getElementById('lib-desc-es').value.trim(),
+            is_required: document.getElementById('lib-req').checked,
+            require_photo: document.getElementById('lib-photo').checked
+        };
+
+        const { error } = await supabase.from('task_library').insert(payload);
+        if (error) alert(error.message);
+        else {
+            onSuccess();
+            close();
+        }
+    };
 }

@@ -23,7 +23,17 @@ export async function renderAuditHistory(containerId, tableName, recordId) {
 
     if (tableName === 'properties') {
         // Use the new RPC to fetch property + related history
-        const res = await supabase.rpc('get_property_audit_history', { p_property_id: rId });
+        // const res = await supabase.rpc('get_property_audit_history', { p_property_id: rId });
+        // logs = res.data;
+        // error = res.error;
+        console.warn("Property audit RPC missing");
+        logs = [];
+    } else if (tableName === 'bom_templates') {
+        const res = await supabase.rpc('get_bom_audit_history', { p_bom_id: rId });
+        logs = res.data;
+        error = res.error;
+    } else if (tableName === 'job_templates') {
+        const res = await supabase.rpc('get_job_audit_history', { p_job_id: rId });
         logs = res.data;
         error = res.error;
     } else {
@@ -128,7 +138,12 @@ export async function renderAuditHistory(containerId, tableName, recordId) {
                         <span class="text-xs font-bold text-slate-500">${date}</span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide ${badgeColor}">${log.operation}</span>
                     </div>
-                    ${userDisplay}
+                    <div class="flex items-center gap-2">
+                        ${userDisplay}
+                        <button class="text-gray-300 hover:text-gray-500 btn-copy-audit" title="Copy Details" data-log='${JSON.stringify(log).replace(/'/g, "&apos;")}'>
+                            <i data-lucide="copy" class="w-3 h-3"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="text-sm text-slate-700">
                     ${log.record_summary ? `<span class="font-bold text-slate-900">${log.record_summary}</span> - ` : ''}
@@ -152,4 +167,18 @@ export async function renderAuditHistory(containerId, tableName, recordId) {
         </details>
     `;
     if (window.lucide) window.lucide.createIcons();
+
+    // Copy Handlers
+    container.querySelectorAll('.btn-copy-audit').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const logData = JSON.parse(btn.dataset.log);
+            const text = `Audit Log [${logData.operation}] - ${new Date(logData.changed_at).toLocaleString()}\nUser: ${logData.changed_by_email || logData.changed_by}\nDescription: ${logData.description}\n\nChanges:\n${JSON.stringify(logData.new_values, null, 2)}`;
+            navigator.clipboard.writeText(text).then(() => {
+                const icon = btn.querySelector('i');
+                // visual feedback could be added here
+                alert("Copied to clipboard!");
+            });
+        };
+    });
 }

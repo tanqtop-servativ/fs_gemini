@@ -662,11 +662,16 @@ async function openEditModal(prop) {
                 onEnd: async (evt) => {
                     // Re-calculate Sort Order based on DOM
                     const newOrderIds = Array.from(div.querySelectorAll('.ref-photo-item')).map(el => el.dataset.id);
+                    const items = newOrderIds.map((id, idx) => ({ id: id, order: idx }));
 
-                    // Update DB Loop (Simple)
-                    for (let i = 0; i < newOrderIds.length; i++) {
-                        await supabase.from('property_reference_photos').update({ sort_order: i }).eq('id', newOrderIds[i]);
-                    }
+                    const { error } = await supabase.rpc('reorder_items', {
+                        p_table: 'property_reference_photos',
+                        p_id_col: 'id',
+                        p_order_col: 'sort_order',
+                        p_items: items
+                    });
+
+                    if (error) console.error("Reorder failed:", error);
                 }
             });
         }

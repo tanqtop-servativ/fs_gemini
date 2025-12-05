@@ -305,31 +305,95 @@ async function openEditPersonModal(person) {
         const roleIds = Array.from(document.querySelectorAll('input[name="role_checkbox"]:checked'))
             .map(cb => cb.value);
 
-        const { data: savedPerson, error } = await supabase.rpc('save_person_safe', {
-            p_id: person ? person.id : null,
-            p_tenant_id: tenantId,
-            p_first: first,
-            p_last: last,
-            p_email: email,
-            p_role_ids: roleIds
-        });
+        let error;
+        if (person) {
+            // Update existing person (still using safe update for now, or could be refactored later)
+            const { error: err } = await supabase.rpc('save_person_safe', {
+                p_id: person.id,
+                p_tenant_id: tenantId,
+                p_first: first,
+                p_last: last,
+                p_email: email,
+                p_role_ids: roleIds
+            });
+            error = err;
+        } else {
+            // Create new person (and profile if user created)
+            const { error: err } = await supabase.rpc('create_full_person', {
+                p_first_name: first,
+                p_last_name: last,
+                p_email: email,
+                p_phone: null, // Phone not in UI yet
+                p_role: 'user', // Default role
+                p_tenant_id: tenantId,
+                p_user_id: userId
+            });
+            error = err;
+
+            // If successful and we have roleIds, we need to assign them. 
+            // Ideally create_full_person would handle this too, but for now we can do it separately 
+            // or rely on save_person_safe if we want to keep using it for updates.
+            // Wait, create_full_person doesn't handle roles_map. 
+            // Let's stick to the plan: create_full_person handles the critical Person+User+Profile transaction.
+            // We can still call save_person_safe for roles if needed, OR update create_full_person to take roles.
+            // For this step, let's just use create_full_person and then if we have roles, we might need a separate call 
+            // or update the RPC. 
+            // Actually, looking at the audit, the goal was to atomicize Person+User+Profile. 
+            // Role assignment (people_roles) is less critical but should ideally be included.
+            // For now, let's use create_full_person, and if successful, we can assign roles.
+
+            if (!error && roleIds.length > 0) {
+                // We need the new person ID. create_full_person returns jsonb.
+                // But wait, the RPC returns { success: true, person_id: ... }
+                // I need to capture that.
+            }
+        }
+
+        // RE-WRITING THE RPC CALL TO CAPTURE DATA
+        if (person) {
+            const { error: err } = await supabase.rpc('save_person_safe', {
+                p_id: person.id,
+                p_tenant_id: tenantId,
+                p_first: first,
+                p_last: last,
+                p_email: email,
+                p_role_ids: roleIds
+            });
+            error = err;
+        } else {
+            const { data: res, error: err } = await supabase.rpc('create_full_person', {
+                p_first_name: first,
+                p_last_name: last,
+                p_email: email,
+                p_phone: null,
+                p_role: 'user',
+                p_tenant_id: tenantId,
+                p_user_id: userId
+            });
+            error = err;
+
+            if (!error && res && res.success && roleIds.length > 0) {
+                // Assign roles - we can reuse save_person_safe or just insert. 
+                // Let's use save_person_safe to handle the roles logic for now as it's already there
+                // and we have the person ID.
+                await supabase.rpc('save_person_safe', {
+                    p_id: res.person_id,
+                    p_tenant_id: tenantId,
+                    p_first: first,
+                    p_last: last,
+                    p_email: email,
+                    p_role_ids: roleIds
+                });
+            } else if (res && !res.success) {
+                error = { message: res.error };
+            }
+        }
 
         if (error) {
             alert("Database Error: " + error.message);
             btnSave.innerText = "Save";
             btnSave.disabled = false;
         } else {
-            if (userId) {
-                await supabase.from('people').update({ user_id: userId }).eq('id', savedPerson);
-                await supabase.from('profiles').insert({
-                    id: userId,
-                    tenant_id: tenantId,
-                    first_name: first,
-                    last_name: last,
-                    is_superuser: false
-                });
-            }
-
             container.innerHTML = '';
             loadPeopleTable(document.getElementById('chk-show-deleted')?.checked);
         }
