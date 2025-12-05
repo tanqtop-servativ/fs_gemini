@@ -16,6 +16,17 @@ AS $function$
                 v_new_role_names text[];
                 r_id uuid;
             BEGIN
+                -- Check for duplicate email within tenant (excluding self)
+                IF EXISTS (
+                    SELECT 1 FROM people 
+                    WHERE email = p_email 
+                    AND tenant_id = p_tenant_id 
+                    AND id != COALESCE(p_id, '00000000-0000-0000-0000-000000000000'::uuid)
+                    AND deleted_at IS NULL
+                ) THEN
+                    RAISE EXCEPTION 'A person with this email already exists in your organization.';
+                END IF;
+
                 -- A. Update Person
                 IF p_id IS NULL THEN
                     INSERT INTO people (tenant_id, first_name, last_name, email)

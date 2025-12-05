@@ -15,6 +15,16 @@ DECLARE
     v_person_id uuid;
     v_profile_id uuid;
 BEGIN
+    -- Check for duplicate email within tenant
+    IF EXISTS (
+        SELECT 1 FROM people 
+        WHERE email = p_email 
+        AND tenant_id = p_tenant_id 
+        AND deleted_at IS NULL
+    ) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'A person with this email already exists in your organization.');
+    END IF;
+
     -- 1. Create Person
     INSERT INTO people (first_name, last_name, email, phone, role, tenant_id, user_id)
     VALUES (p_first_name, p_last_name, p_email, p_phone, p_role, p_tenant_id, p_user_id)
