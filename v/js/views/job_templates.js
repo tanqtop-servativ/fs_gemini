@@ -213,11 +213,11 @@ export async function renderJobTemplates(container) {
             const list = document.getElementById('task-list');
             if (!list) return;
             if (tasks.length === 0) {
-                list.innerHTML = `< div class="text-center text-gray-400 text-xs italic py-4" > No tasks added yet.</div > `;
+                list.innerHTML = `<div class="text-center text-gray-400 text-xs italic py-4">No tasks added yet.</div>`;
                 return;
             }
             list.innerHTML = tasks.map((t, idx) => `
-        < div class="flex gap-3 items-start bg-slate-50 p-3 rounded border border-slate-200 group task-item" data - original - idx="${idx}" >
+                <div class="flex gap-3 items-start bg-slate-50 p-3 rounded border border-slate-200 group task-item" data-original-idx="${idx}">
                     <div class="mt-1 flex flex-col items-center gap-2">
                         <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing"></i>
                         <div class="text-slate-400 font-mono text-xs">${idx + 1}</div>
