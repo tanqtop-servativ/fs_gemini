@@ -215,9 +215,18 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
             // FullCalendar bubbling works well commonly, let's rely on container listener.
 
             if (tippy) {
+                const fmt = (d) => d ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+                const timeStr = `${fmt(info.event.start)} - ${fmt(info.event.end)}`;
+
                 tippy(info.el, {
-                    content: `<strong>${info.event.title}</strong><br>${props.property_name || ''}<br>${props.property_address || ''}`,
-                    allowHTML: true
+                    content: `
+                        <div class="font-bold">${info.event.title}</div>
+                        <div class="text-xs text-blue-200 border-b border-white/20 pb-1 mb-1">${timeStr}</div>
+                        <div class="text-xs">${props.property_name || ''}</div>
+                        <div class="text-[10px] opacity-75">${props.property_address || ''}</div>
+                    `,
+                    allowHTML: true,
+                    theme: 'light-border' // Optional, if configured, but default is usually fine
                 });
             }
         }
