@@ -739,7 +739,7 @@ async function openEditModal(prop) {
     document.getElementById('btn-apply-tmpl').onclick = async () => {
         const tmplId = document.getElementById('sel-template').value;
         if (!tmplId) return;
-        const { data: items } = await supabase.from('bom_template_items').select('*').eq('template_id', tmplId);
+        const { data: items } = await supabase.from('bom_template_items').select('*').eq('bom_template_id', tmplId);
         if (items) {
             items.forEach(newItem => {
                 const existingIdx = inventory.findIndex(i => i.name.toLowerCase() === newItem.item_name.toLowerCase());
