@@ -177,13 +177,14 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
     const initialMonths = 1;
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'multiMonthYear',
+        initialView: 'multiMonth1',
         views: {
-            multiMonthYear: {
-                type: 'multiMonthYear',
-                duration: { months: initialMonths },
-                multiMonthMaxColumns: (initialMonths > 1) ? 2 : 1 // Adjust columns based on count
-            }
+            multiMonth1: { type: 'multiMonthYear', duration: { months: 1 }, multiMonthMaxColumns: 1 },
+            multiMonth2: { type: 'multiMonthYear', duration: { months: 2 }, multiMonthMaxColumns: 2 },
+            multiMonth3: { type: 'multiMonthYear', duration: { months: 3 }, multiMonthMaxColumns: 2 },
+            multiMonth4: { type: 'multiMonthYear', duration: { months: 4 }, multiMonthMaxColumns: 2 },
+            multiMonth5: { type: 'multiMonthYear', duration: { months: 5 }, multiMonthMaxColumns: 3 },
+            multiMonth6: { type: 'multiMonthYear', duration: { months: 6 }, multiMonthMaxColumns: 3 },
         },
         headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
         height: '100%',
@@ -194,7 +195,7 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
         eventContent: function (arg) {
             const props = arg.event.extendedProps;
             // Simplified content for MultiMonth view to avoid overflow
-            if (arg.view.type === 'multiMonthYear') {
+            if (arg.view.type.startsWith('multiMonth')) {
                 return {
                     html: `<div class="text-[10px] truncate px-1 rounded-sm leading-tight" style="color:${arg.event.textColor || '#fff'}">${arg.event.title}</div>`
                 };
@@ -258,29 +259,32 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
 
     const onViewChange = (e) => {
         const viewName = e.target.value;
-        calendar.changeView(viewName);
+        // If user selects "multiMonthYear" from dropdown, default to 1 month (or current selection? logic needed)
+        // Actually, the main view selector should probably map "multiMonthYear" to "multiMonth1" initially
+        // OR we check if viewName STARTS with multiMonth
 
-        // Show/Hide Month Selector based on view
+        let targetView = viewName;
+        if (viewName === 'multiMonthYear') {
+            const currentMonthVal = document.getElementById(monthSelectorId)?.value || '1';
+            targetView = 'multiMonth' + currentMonthVal;
+        }
+
+        calendar.changeView(targetView);
+
+        // Show/Hide Month Selector based on view type
         const monthSel = document.getElementById(monthSelectorId);
         if (monthSel) {
-            monthSel.style.display = (viewName === 'multiMonthYear') ? 'inline-block' : 'none';
+            monthSel.style.display = (targetView.startsWith('multiMonth')) ? 'inline-block' : 'none';
         }
     };
 
     const onMonthChange = (e) => {
-        const months = parseInt(e.target.value);
-        const cols = (months > 1) ? (months > 4 ? 3 : 2) : 1;
+        const months = e.target.value;
+        calendar.changeView('multiMonth' + months);
 
-        // Change view with explicit duration AND columns
-        // This ensures the view updates its specific config
-        calendar.changeView('multiMonthYear', {
-            duration: { months: months },
-            multiMonthMaxColumns: cols
-        });
-
-        // Ensure View Selector matches
+        // Ensure View Selector matches "Month View" concept
         const viewSel = document.getElementById(viewSelectorId);
-        if (viewSel) viewSel.value = 'multiMonthYear';
+        if (viewSel && viewSel.value !== 'multiMonthYear') viewSel.value = 'multiMonthYear';
     };
 
     if (propSelector) {
