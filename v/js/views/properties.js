@@ -323,7 +323,7 @@ async function openEditModal(prop) {
     const tenantId = getTenantId();
 
     const { data: people } = await supabase.from('people').select('id, first_name, last_name, person_roles(roles(name))');
-    const { data: templates } = await supabase.from('bom_templates').select('id, name').eq('tenant_id', tenantId);
+    const { data: templates } = await supabase.from('bom_templates').select('id, name').eq('tenant_id', tenantId).is('deleted_at', null);
     const { data: catalog } = await supabase.from('master_item_catalog').select('*').eq('tenant_id', tenantId);
 
     let codes = [], feeds = [], inventory = [], refPhotos = [], attachments = [];
@@ -876,6 +876,9 @@ async function openEditModal(prop) {
 
         const ownerIds = Array.from(document.querySelectorAll('.chk-owner:checked')).map(cb => cb.value);
         const mgrIds = Array.from(document.querySelectorAll('.chk-manager:checked')).map(cb => cb.value);
+
+        if (ownerIds.length === 0) return alert("At least one Owner is required.");
+        if (mgrIds.length === 0) return alert("At least one Property Manager is required.");
 
         const payload = {
             p_tenant_id: getTenantId(),
