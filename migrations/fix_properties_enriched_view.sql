@@ -29,7 +29,6 @@ SELECT
     p.square_footage,
     p.bathroom_sinks,
     p.bath_mats,
-    p.is_active,
     (SELECT string_agg(pe.first_name || ' ' || COALESCE(pe.last_name, ''), ', ')
      FROM property_assignments pa
      JOIN people pe ON pe.id = pa.person_id

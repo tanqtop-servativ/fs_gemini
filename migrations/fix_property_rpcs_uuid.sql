@@ -32,7 +32,6 @@ CREATE OR REPLACE FUNCTION public.create_property_safe(
     p_bath_mats integer,
     p_time_zone text,
     p_is_dst boolean,
-    p_is_active boolean DEFAULT true,
     p_feeds jsonb DEFAULT '[]'::jsonb, 
     p_inventory jsonb DEFAULT '[]'::jsonb,
     p_attachments jsonb DEFAULT '[]'::jsonb
@@ -59,8 +58,7 @@ BEGIN
         bedrooms, bathrooms, max_guests, has_pool, has_bbq, allows_pets, parking_instructions,
         has_casita, square_footage,
         bathroom_sinks, bath_mats,
-        time_zone, is_dst,
-        is_active
+        time_zone, is_dst
     )
     VALUES (
         p_tenant_id, p_name, p_address, p_hcp_cust, p_hcp_addr, 
@@ -69,8 +67,7 @@ BEGIN
         p_bedrooms, p_bathrooms, p_max_guests, p_has_pool, p_has_bbq, p_allows_pets, p_parking_instructions,
         p_has_casita, p_square_footage,
         p_bathroom_sinks, p_bath_mats,
-        p_time_zone, p_is_dst,
-        p_is_active
+        p_time_zone, p_is_dst
     )
     RETURNING id INTO new_prop_id;
 
@@ -147,7 +144,6 @@ CREATE OR REPLACE FUNCTION public.update_property_safe(
     p_bath_mats integer,
     p_time_zone text,
     p_is_dst boolean,
-    p_is_active boolean DEFAULT true,
     p_feeds jsonb DEFAULT '[]'::jsonb, 
     p_inventory jsonb DEFAULT '[]'::jsonb
 )
@@ -176,8 +172,7 @@ BEGIN
         parking_instructions = p_parking_instructions,
         has_casita = p_has_casita, square_footage = p_square_footage,
         bathroom_sinks = p_bathroom_sinks, bath_mats = p_bath_mats,
-        time_zone = p_time_zone, is_dst = p_is_dst,
-        is_active = p_is_active
+        time_zone = p_time_zone, is_dst = p_is_dst
     WHERE id = p_id;
 
     DELETE FROM property_assignments WHERE property_id = p_id;
