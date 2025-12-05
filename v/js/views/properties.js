@@ -878,6 +878,7 @@ async function openEditModal(prop) {
         const mgrIds = Array.from(document.querySelectorAll('.chk-manager:checked')).map(cb => cb.value);
 
         const payload = {
+            p_tenant_id: getTenantId(),
             p_name: name,
             p_address: document.getElementById('inp-addr').value,
             p_hcp_cust: document.getElementById('inp-cust').value,

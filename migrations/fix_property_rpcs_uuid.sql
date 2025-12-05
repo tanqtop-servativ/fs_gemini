@@ -2,6 +2,7 @@
 
 -- 1. create_property_safe
 CREATE OR REPLACE FUNCTION public.create_property_safe(
+    p_tenant_id uuid,
     p_name text, 
     p_address text, 
     p_hcp_cust text, 
@@ -60,7 +61,7 @@ BEGIN
         time_zone, is_dst
     )
     VALUES (
-        '3e677c58-867f-4a58-93c0-609129038cb9', p_name, p_address, p_hcp_cust, p_hcp_addr, 
+        p_tenant_id, p_name, p_address, p_hcp_cust, p_hcp_addr, 
         p_checkin, p_checkout, p_photo_url,
         p_wifi_network, p_wifi_password,
         p_bedrooms, p_bathrooms, p_max_guests, p_has_pool, p_has_bbq, p_allows_pets, p_parking_instructions,
