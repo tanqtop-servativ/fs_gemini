@@ -11,11 +11,19 @@ def inspect_properties_schema():
         conn = psycopg2.connect(DB_CONNECTION_STRING)
         cur = conn.cursor()
         
-        cur.execute("SELECT id, name FROM tenants;")
-        rows = cur.fetchall()
-        print(f"--- Tenants ({len(rows)}) ---")
-        for r in rows:
-            print(f"{r[0]} ({r[1]})")
+        tables = ['property_access_codes', 'property_inventory', 'calendar_feeds', 'property_assignments']
+        for table in tables:
+            cur.execute(f"""
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = '{table}'
+                ORDER BY ordinal_position;
+            """)
+            columns = cur.fetchall()
+            print(f"--- {table} Schema ({len(columns)} columns) ---")
+            for col in columns:
+                print(f"{col[0]}: {col[1]}")
+            print("-" * 40)
             
     except Exception as e:
         print(f"Error: {e}")
