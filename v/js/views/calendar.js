@@ -178,8 +178,10 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'multiMonth1',
+        showNonCurrentDates: true,
+        fixedWeekCount: false,
         views: {
-            multiMonth1: { type: 'multiMonthYear', duration: { months: 1 }, multiMonthMaxColumns: 1 },
+            multiMonth1: { type: 'dayGridMonth', duration: { months: 1 } },
             multiMonth2: { type: 'multiMonthYear', duration: { months: 2 }, multiMonthMaxColumns: 1 },
             multiMonth3: { type: 'multiMonthYear', duration: { months: 3 }, multiMonthMaxColumns: 1 },
             multiMonth4: { type: 'multiMonthYear', duration: { months: 4 }, multiMonthMaxColumns: 1 },
@@ -194,8 +196,8 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
         events: [],
         eventContent: function (arg) {
             const props = arg.event.extendedProps;
-            // Simplified content for MultiMonth view to avoid overflow
-            if (arg.view.type.startsWith('multiMonth')) {
+            // Simplified content for MultiMonth view to avoid overflow (except for 1-month view which is now DayGrid)
+            if (arg.view.type.startsWith('multiMonth') && arg.view.type !== 'multiMonth1') {
                 return {
                     html: `<div class="text-[10px] truncate px-1 rounded-sm leading-tight" style="color:${arg.event.textColor || '#fff'}">${arg.event.title}</div>`
                 };
