@@ -433,44 +433,62 @@ export async function renderJobTemplates(container) {
         }
 
         document.getElementById('btn-save').onclick = async () => {
-            const name = document.getElementById('inp-name').value.trim();
-            const desc = document.getElementById('inp-desc').value.trim();
-            const nameEs = document.getElementById('inp-name-es').value.trim();
-            const descEs = document.getElementById('inp-desc-es').value.trim();
+            try {
+                const name = document.getElementById('inp-name').value.trim();
+                const desc = document.getElementById('inp-desc').value.trim();
+                const nameEs = document.getElementById('inp-name-es').value.trim();
+                const descEs = document.getElementById('inp-desc-es').value.trim();
 
-            if (!name) return alert("English Name is required");
-            if (!nameEs) return alert("Spanish Name is required");
-            if (tasks.some(t => !t.title.trim())) return alert("All tasks must have an English title");
-            if (tasks.some(t => !t.title_es || !t.title_es.trim())) return alert("All tasks must have a Spanish title");
+                console.log("Saving Template...", { name, tasks });
 
-            let err;
-            if (isEdit) {
-                const updatePayload = {
-                    p_id: tmpl.id,
-                    p_name: name,
-                    p_description: desc,
-                    p_name_es: nameEs,
-                    p_description_es: descEs,
-                    p_tasks: tasks
-                };
-                const { error } = await supabase.rpc('update_job_template', updatePayload);
-                err = error;
-            } else {
-                const createPayload = {
-                    p_name: name,
-                    p_description: desc,
-                    p_name_es: nameEs,
-                    p_description_es: descEs,
-                    p_tasks: tasks
-                };
-                const { error } = await supabase.rpc('create_job_template', createPayload);
-                err = error;
-            }
+                if (!name) return alert("English Name is required");
+                if (!nameEs) return alert("Spanish Name is required");
 
-            if (err) alert("Error: " + err.message);
-            else {
-                modal.innerHTML = '';
-                fetchTemplates(document.getElementById('chk-show-archived')?.checked);
+                // Safe validation logging
+                tasks.forEach((t, i) => {
+                    if (!t.title || typeof t.title !== 'string') console.warn(`Task ${i} title invalid:`, t.title);
+                });
+
+                if (tasks.some(t => !t.title || !t.title.trim())) return alert("All tasks must have an English title");
+                if (tasks.some(t => !t.title_es || !t.title_es.trim())) return alert("All tasks must have a Spanish title");
+
+                let err;
+                if (isEdit) {
+                    const updatePayload = {
+                        p_id: tmpl.id,
+                        p_name: name,
+                        p_description: desc,
+                        p_name_es: nameEs,
+                        p_description_es: descEs,
+                        p_tasks: tasks
+                    };
+                    console.log("Sending Update Payload:", updatePayload);
+                    const { error } = await supabase.rpc('update_job_template', updatePayload);
+                    err = error;
+                } else {
+                    const createPayload = {
+                        p_name: name,
+                        p_description: desc,
+                        p_name_es: nameEs,
+                        p_description_es: descEs,
+                        p_tasks: tasks
+                    };
+                    console.log("Sending Create Payload:", createPayload);
+                    const { error } = await supabase.rpc('create_job_template', createPayload);
+                    err = error;
+                }
+
+                if (err) {
+                    console.error("RPC Error:", err);
+                    alert("Error: " + err.message);
+                } else {
+                    console.log("Save Successful");
+                    modal.innerHTML = '';
+                    fetchTemplates(document.getElementById('chk-show-archived')?.checked);
+                }
+            } catch (e) {
+                console.error("Save Handler Error:", e);
+                alert("Unexpected Error: " + e.message);
             }
         };
 
