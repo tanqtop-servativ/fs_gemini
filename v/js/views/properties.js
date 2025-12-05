@@ -378,6 +378,7 @@ async function openEditModal(prop) {
     const valPets = prop ? prop.allows_pets : false;
     const valCasita = prop ? prop.has_casita : false;
     const valParking = prop ? (prop.parking_instructions || '') : '';
+    const valIsActive = prop ? (prop.is_active !== false) : true; // Default to active for new properties
 
     const photoHtml = valPhoto
         ? `<img src="${valPhoto}" class="w-full h-32 object-cover rounded-lg border border-gray-200 mb-2">`
@@ -476,6 +477,14 @@ async function openEditModal(prop) {
                 
                 <input id="inp-name" class="w-full border p-2 rounded" placeholder="Property Name" value="${valName}">
                 
+                <div class="flex gap-4 items-center">
+                    <label class="text-xs font-bold uppercase text-gray-500">Scheduling Status:</label>
+                    <select id="sel-status" class="border p-2 rounded bg-white text-sm">
+                        <option value="true" ${valIsActive ? 'selected' : ''}>Active</option>
+                        <option value="false" ${!valIsActive ? 'selected' : ''}>Inactive</option>
+                    </select>
+                </div>
+                
                 <div class="flex gap-2">
                     <select id="sel-country" class="border p-2 rounded bg-white text-sm"><option value="us">🇺🇸</option><option value="ca">🇨🇦</option></select>
                     <div class="relative flex-1">
@@ -533,8 +542,8 @@ async function openEditModal(prop) {
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
-                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Owners</label><div id="list-owners" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
-                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Managers</label><div id="list-managers" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
+                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Owners <span class="text-red-500">*</span></label><div id="list-owners" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
+                    <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property Managers <span class="text-red-500">*</span></label><div id="list-managers" class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1"></div></div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
@@ -911,6 +920,7 @@ async function openEditModal(prop) {
             p_has_casita: document.getElementById('chk-casita').checked,
             p_casita_code: document.getElementById('code-casita').value,
             p_parking_instructions: document.getElementById('inp-parking').value,
+            p_is_active: document.getElementById('sel-status').value === 'true',
             p_feeds: feedsData,
             p_inventory: inventory
         };
