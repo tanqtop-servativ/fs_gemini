@@ -60,7 +60,7 @@ BEGIN
         time_zone, is_dst
     )
     VALUES (
-        '1b71cbe1-02ea-4fb1-8884-3bb1282ad1b7', p_name, p_address, p_hcp_cust, p_hcp_addr, 
+        '3e677c58-867f-4a58-93c0-609129038cb9', p_name, p_address, p_hcp_cust, p_hcp_addr, 
         p_checkin, p_checkout, p_photo_url,
         p_wifi_network, p_wifi_password,
         p_bedrooms, p_bathrooms, p_max_guests, p_has_pool, p_has_bbq, p_allows_pets, p_parking_instructions,

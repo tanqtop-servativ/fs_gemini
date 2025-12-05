@@ -11,17 +11,11 @@ def inspect_properties_schema():
         conn = psycopg2.connect(DB_CONNECTION_STRING)
         cur = conn.cursor()
         
-        cur.execute("""
-            SELECT column_name, data_type 
-            FROM information_schema.columns 
-            WHERE table_name = 'properties'
-            ORDER BY ordinal_position;
-        """)
-        
-        columns = cur.fetchall()
-        print(f"--- Properties Table Schema ({len(columns)} columns) ---")
-        for col in columns:
-            print(f"{col[0]}: {col[1]}")
+        cur.execute("SELECT id, name FROM tenants;")
+        rows = cur.fetchall()
+        print(f"--- Tenants ({len(rows)}) ---")
+        for r in rows:
+            print(f"{r[0]} ({r[1]})")
             
     except Exception as e:
         print(f"Error: {e}")
