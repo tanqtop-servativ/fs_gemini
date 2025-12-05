@@ -116,7 +116,8 @@ $function$;
 
 -- 2. update_property_safe
 CREATE OR REPLACE FUNCTION public.update_property_safe(
-    p_id uuid, 
+    p_id uuid,
+    p_tenant_id uuid,
     p_name text, 
     p_address text, 
     p_hcp_cust text, 
