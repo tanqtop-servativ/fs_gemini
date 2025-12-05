@@ -33,16 +33,10 @@ CREATE OR REPLACE FUNCTION public.delete_property_safe(p_id uuid)
  LANGUAGE plpgsql
 AS $function$
 BEGIN
-    -- 1. Mark the Property as 'archived' (Soft Delete)
+    -- Mark the Property as 'archived' (Soft Delete)
     UPDATE properties
     SET status = 'archived'
     WHERE id = p_id;
-
-    -- 2. Cancel future Service Jobs
-    UPDATE service_jobs
-    SET status = 'cancelled'
-    WHERE property_id = p_id 
-    AND scheduled_start > NOW();
 END;
 $function$;
 
