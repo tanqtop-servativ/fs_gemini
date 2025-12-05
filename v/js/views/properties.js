@@ -594,7 +594,6 @@ async function openEditModal(prop) {
                 const { data: newRow, error: dbErr } = await supabase.from('property_attachments').insert({
                     property_id: propId,
                     file_name: file.name,
-                    storage_path: fileName,
                     file_url: publicUrl
                 }).select().single();
 
@@ -689,7 +688,6 @@ async function openEditModal(prop) {
 
                 const { data: newRow, error: dbErr } = await supabase.from('property_reference_photos').insert({
                     property_id: prop.id,
-                    storage_path: path,
                     photo_url: publicUrl,
                     label: file.name, // Using file.name as initial label
                     sort_order: refPhotos.length // Append to end
