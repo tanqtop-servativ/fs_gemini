@@ -119,8 +119,8 @@ async function openReadModal(prop) {
 
     const refPhotoList = (refPhotos && refPhotos.length)
         ? `<div class="grid grid-cols-3 gap-2 mt-2">` + refPhotos.map(p => `
-            <a href="${p.public_url}" target="_blank" class="block relative group">
-                <img src="${p.public_url}" class="w-full h-20 object-cover rounded border border-gray-200">
+            <a href="${p.photo_url}" target="_blank" class="block relative group">
+                <img src="${p.photo_url}" class="w-full h-20 object-cover rounded border border-gray-200">
                 ${p.label ? `<div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] p-1 truncate">${p.label}</div>` : ''}
             </a>`).join('') + `</div>`
         : null;
@@ -128,7 +128,7 @@ async function openReadModal(prop) {
     const attList = (attachments && attachments.length)
         ? attachments.map(a => `
             <div class="flex justify-between items-center border-b border-gray-50 py-1">
-                <a href="${a.public_url}" target="_blank" class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                <a href="${a.file_url}" target="_blank" class="text-xs text-blue-600 hover:underline flex items-center gap-1">
                     <i data-lucide="file" class="w-3 h-3"></i> ${a.file_name}
                 </a>
                 <span class="text-[10px] text-gray-400">${new Date(a.created_at).toLocaleDateString()}</span>
@@ -572,7 +572,7 @@ async function openEditModal(prop) {
         if (attachments.length === 0) { div.innerHTML = '<div class="text-center text-gray-300 text-xs italic">No attachments.</div>'; return; }
         div.innerHTML = attachments.map(a => `
             <div class="flex justify-between items-center bg-white p-2 rounded border border-gray-200">
-                <a href="${a.public_url}" target="_blank" class="text-xs text-blue-600 hover:underline flex items-center gap-2">
+                <a href="${a.file_url}" target="_blank" class="text-xs text-blue-600 hover:underline flex items-center gap-2">
                     <i data-lucide="file" class="w-3 h-3"></i> ${a.file_name}
                 </a>
                 <button onclick="window.deleteAttachment('${a.id}')" class="text-red-300 hover:text-red-500"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
@@ -595,7 +595,7 @@ async function openEditModal(prop) {
                     property_id: propId,
                     file_name: file.name,
                     storage_path: fileName,
-                    public_url: publicUrl
+                    file_url: publicUrl
                 }).select().single();
 
                 if (dbErr) throw dbErr;
@@ -636,7 +636,7 @@ async function openEditModal(prop) {
         div.innerHTML = refPhotos.map((p, idx) => `
             <div class="ref-photo-item flex gap-3 items-start bg-white p-2 rounded border border-orange-100 shadow-sm" data-id="${p.id}" data-idx="${idx}">
                 <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-300 cursor-grab mt-4"></i>
-                <a href="${p.public_url}" target="_blank"><img src="${p.public_url}" class="w-12 h-12 rounded object-cover border"></a>
+                <a href="${p.photo_url}" target="_blank"><img src="${p.photo_url}" class="w-12 h-12 rounded object-cover border"></a>
                 <div class="flex-1 space-y-1">
                     <textarea class="w-full text-xs border border-gray-100 rounded p-1 focus:border-orange-400 outline-none resize-none h-8" 
                            placeholder="Description (e.g. Bed Setup)" 
@@ -690,7 +690,7 @@ async function openEditModal(prop) {
                 const { data: newRow, error: dbErr } = await supabase.from('property_reference_photos').insert({
                     property_id: prop.id,
                     storage_path: path,
-                    public_url: publicUrl,
+                    photo_url: publicUrl,
                     label: file.name, // Using file.name as initial label
                     sort_order: refPhotos.length // Append to end
                 }).select().single();
