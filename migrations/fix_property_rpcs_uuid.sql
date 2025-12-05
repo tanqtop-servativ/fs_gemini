@@ -158,8 +158,8 @@ DECLARE
   feed_item JSONB;
   inv_item JSONB;
   pid UUID;
-  f_id INT;
-  feed_ids_to_keep INT[] := '{}';
+  f_id UUID;
+  feed_ids_to_keep UUID[] := '{}';
   role_owner_id UUID;
   role_manager_id UUID;
 BEGIN
@@ -207,7 +207,7 @@ BEGIN
     -- Feeds (Smart Update)
     IF p_feeds IS NOT NULL THEN
         FOR feed_item IN SELECT * FROM jsonb_array_elements(p_feeds) LOOP
-            f_id := (feed_item->>'id')::INT;
+            f_id := (feed_item->>'id')::UUID;
             
             IF f_id IS NOT NULL THEN
                 -- Update existing
