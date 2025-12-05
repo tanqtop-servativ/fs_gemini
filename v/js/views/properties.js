@@ -27,10 +27,11 @@ export async function renderProperties(container) {
               <th class="px-6 py-4">Property</th>
               <th class="px-6 py-4">Address</th>
               <th class="px-6 py-4">Assignments</th>
+              <th class="px-6 py-4 text-center">Status</th>
               <th class="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody id="props-body"><tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">Loading...</td></tr></tbody>
+          <tbody id="props-body"><tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">Loading...</td></tr></tbody>
         </table>
       </div>`;
 
@@ -64,6 +65,11 @@ async function loadTableData(showArchived = false) {
             ? `<img src="${p.front_photo_url}" class="w-10 h-10 rounded object-cover border border-gray-200 ${isArchived ? 'grayscale' : ''}">`
             : `<div class="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-400"><i data-lucide="home" class="w-5 h-5"></i></div>`;
 
+        const isActive = p.is_active !== false;
+        const statusBadge = isActive
+            ? '<span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded font-bold">Active</span>'
+            : '<span class="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold">Inactive</span>';
+
         return `<tr class="border-b border-gray-100 ${isArchived ? 'bg-gray-50 opacity-75' : 'hover:bg-gray-50'} group cursor-pointer" onclick="window.viewProp('${p.id}')">
             <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
@@ -77,6 +83,7 @@ async function loadTableData(showArchived = false) {
                 <div class="flex items-center gap-1"><span class="font-bold text-slate-400 w-12">Own:</span> ${p.owner_names || 'None'}</div>
                 <div class="flex items-center gap-1"><span class="font-bold text-slate-400 w-12">Mgr:</span> ${p.manager_names || 'None'}</div>
             </td>
+            <td class="px-6 py-4 text-center">${statusBadge}</td>
             <td class="px-6 py-4 text-right">
                 <button class="text-slate-400 hover:text-blue-600 p-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
             </td>
