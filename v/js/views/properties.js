@@ -225,7 +225,6 @@ async function openReadModal(prop) {
                         <button id="btn-edit-prop" class="text-gray-400 hover:text-black transition-colors" title="Edit Property">
                             <i data-lucide="pencil" class="w-5 h-5"></i>
                         </button>
-                        <div class="text-green-600 font-bold text-xs uppercase border border-green-200 bg-green-50 px-2 py-1 rounded">${prop.status || 'Active'}</div>
                     </div>
                 </div>
 
