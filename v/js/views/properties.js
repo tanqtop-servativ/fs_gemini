@@ -141,7 +141,7 @@ async function openPropertyCalendarModal(propId, propName) {
                 </div>
                 
                 <!-- Body -->
-                <div class="flex-1 p-6 overflow-hidden bg-slate-50">
+                <div class="flex-1 p-6 overflow-y-auto bg-slate-50">
                     <div id="prop-cal-container-${propId}" class="h-full bg-white rounded-xl shadow-sm border border-gray-200 p-4"></div>
                 </div>
             </div>

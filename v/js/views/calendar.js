@@ -269,11 +269,14 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
 
     const onMonthChange = (e) => {
         const months = parseInt(e.target.value);
-        // Correctly update option via setOption API
-        calendar.setOption('multiMonthMaxColumns', (months > 1) ? (months > 4 ? 3 : 2) : 1);
+        const cols = (months > 1) ? (months > 4 ? 3 : 2) : 1;
 
-        // Then change view duration
-        calendar.changeView('multiMonthYear', { duration: { months: months } });
+        // Change view with explicit duration AND columns
+        // This ensures the view updates its specific config
+        calendar.changeView('multiMonthYear', {
+            duration: { months: months },
+            multiMonthMaxColumns: cols
+        });
 
         // Ensure View Selector matches
         const viewSel = document.getElementById(viewSelectorId);
