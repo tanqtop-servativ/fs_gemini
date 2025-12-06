@@ -31,4 +31,29 @@ SELECT
 FROM bookings b
 JOIN properties p ON p.id = b.property_id
 LEFT JOIN calendar_feeds cf ON cf.id = b.feed_id
-WHERE b.status != 'cancelled';
+WHERE b.status != 'cancelled'
+
+UNION ALL
+
+SELECT 
+    so.id::text as id,
+    so.property_id,
+    p.name as property_name,
+    p.address as property_address,
+    COALESCE(so.title, 'Service Opportunity') as title,
+    so.due_date::timestamp as start_date,
+    (so.due_date + interval '1 hour')::timestamp as end_date,
+    'Service' as event_type,
+    CASE 
+        WHEN so.status = 'completed' THEN '#10b981' -- Emerald
+        WHEN so.status = 'cancelled' THEN '#ef4444' -- Red
+        ELSE '#8b5cf6' -- Violet for Open/In Progress
+    END as color,
+    '' as class_name,
+    false as all_day,
+    so.description,
+    '' as code,
+    so.tenant_id
+FROM service_opportunities so
+JOIN properties p ON p.id = so.property_id
+WHERE so.status != 'archived';
