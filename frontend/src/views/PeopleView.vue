@@ -1,7 +1,6 @@
-<script setup>
 import { ref, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
-import { Plus, Eye, Mail, Shield } from 'lucide-vue-next'
+import { Plus, Eye, Mail, Shield, UserCircle } from 'lucide-vue-next'
 import PersonDetailModal from '../components/people/PersonDetailModal.vue'
 import PersonFormModal from '../components/people/PersonFormModal.vue'
 import RolesManagerModal from '../components/people/RolesManagerModal.vue'
@@ -20,7 +19,12 @@ const selectedPerson = ref(null)
 // Actions
 import { useAuth } from '../composables/useAuth'
 
-const { userProfile } = useAuth()
+const { userProfile, user, isTenantAdmin, impersonateUser } = useAuth()
+
+const handleImpersonate = async (p) => {
+    const fullName = `${p.first_name} ${p.last_name}`
+    await impersonateUser(p.user_id, fullName)
+}
 
 const fetchData = async () => {
     const tenantId = userProfile.value?.tenant_id
@@ -148,7 +152,15 @@ const handleRestore = async (p) => {
                  </div>
              </td>
              <!-- Actions -->
-             <td class="px-6 py-4 text-right" @click.stop>
+             <td class="px-6 py-4 text-right flex justify-end gap-1" @click.stop>
+                 <button 
+                     v-if="isTenantAdmin && p.user_id && p.user_id !== user?.id"
+                     @click="handleImpersonate(p)" 
+                     class="text-teal-600 hover:text-teal-800 transition-colors font-bold text-xs border border-teal-200 rounded bg-teal-50 hover:bg-teal-100 px-2 py-1"
+                     title="View as this user"
+                 >
+                     View As
+                 </button>
                  <button @click="openDetail(p)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
                      <Eye size="16" />
                  </button>

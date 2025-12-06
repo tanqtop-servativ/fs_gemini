@@ -1,11 +1,15 @@
 <script setup>
 import { computed } from 'vue'
-import { Home, Calendar, Users, ClipboardList, LogOut, GitMerge, Package, Shield, Activity, Zap } from 'lucide-vue-next'
+import { Home, Calendar, Users, ClipboardList, LogOut, GitMerge, Package, Shield, Activity, Zap, X } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { signOut, userProfile, user, isImpersonating, effectiveTenantName } = useAuth()
+const { 
+    signOut, userProfile, user, 
+    isImpersonating, effectiveTenantName,
+    isImpersonatingUser, impersonatedUserName, stopImpersonatingUser
+} = useAuth()
 
 const isSuperuser = computed(() => userProfile.value?.is_superuser)
 
@@ -56,6 +60,17 @@ const handleLogout = async () => {
     </nav>
 
     <div class="p-4 border-t border-gray-200">
+      <!-- User Impersonation Banner -->
+      <div v-if="isImpersonatingUser" class="mb-3 bg-teal-50 border border-teal-200 rounded-lg p-2 flex justify-between items-center">
+        <div class="text-xs">
+          <div class="font-bold text-teal-800">Viewing as:</div>
+          <div class="text-teal-600 truncate">{{ impersonatedUserName }}</div>
+        </div>
+        <button @click="stopImpersonatingUser" class="p-1 text-teal-600 hover:text-teal-800 hover:bg-teal-100 rounded" title="Stop viewing as user">
+          <X size="14" />
+        </button>
+      </div>
+
       <button
         @click="handleLogout"
         class="flex items-center gap-3 px-4 py-3 w-full text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

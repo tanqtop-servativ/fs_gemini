@@ -4,22 +4,34 @@ import { supabase } from '../lib/supabase'
 const user = ref(null)
 const userProfile = ref(null)
 const loading = ref(true)
+
+// Tenant impersonation state (superuser only)
 const impersonatedTenantId = ref(null)
 const impersonatedTenantName = ref(null)
 
+// User impersonation state (tenant admin only)
+const impersonatedUserId = ref(null)
+const impersonatedUserName = ref(null)
+
 // Check localStorage for existing impersonation on module load
-const storedImpersonation = localStorage.getItem('impersonated_tenant_id')
-if (storedImpersonation) {
-    impersonatedTenantId.value = storedImpersonation
+const storedTenantImpersonation = localStorage.getItem('impersonated_tenant_id')
+if (storedTenantImpersonation) {
+    impersonatedTenantId.value = storedTenantImpersonation
+}
+
+const storedUserImpersonation = localStorage.getItem('impersonated_user_id')
+const storedUserName = localStorage.getItem('impersonated_user_name')
+if (storedUserImpersonation) {
+    impersonatedUserId.value = storedUserImpersonation
+    impersonatedUserName.value = storedUserName
 }
 
 export function useAuth() {
-    // Computed: are we impersonating?
+    // === TENANT IMPERSONATION (Superuser) ===
     const isImpersonating = computed(() => {
         return !!impersonatedTenantId.value && userProfile.value?.is_superuser
     })
 
-    // Computed: effective tenant ID (impersonated or real)
     const effectiveTenantId = computed(() => {
         if (isImpersonating.value) {
             return impersonatedTenantId.value
@@ -27,12 +39,25 @@ export function useAuth() {
         return userProfile.value?.tenant_id
     })
 
-    // Computed: effective tenant name
     const effectiveTenantName = computed(() => {
         if (isImpersonating.value && impersonatedTenantName.value) {
             return impersonatedTenantName.value
         }
         return userProfile.value?.tenants?.name || 'No Tenant'
+    })
+
+    // === USER IMPERSONATION (Tenant Admin) ===
+    const isTenantAdmin = computed(() => userProfile.value?.is_tenant_admin)
+
+    const isImpersonatingUser = computed(() => {
+        return !!impersonatedUserId.value && isTenantAdmin.value
+    })
+
+    const effectiveUserId = computed(() => {
+        if (isImpersonatingUser.value) {
+            return impersonatedUserId.value
+        }
+        return user.value?.id
     })
 
     const initAuth = async () => {
@@ -65,7 +90,7 @@ export function useAuth() {
             .single()
         userProfile.value = data
 
-        // If superuser and impersonating, fetch the impersonated tenant name
+        // If superuser and impersonating tenant, fetch the impersonated tenant name
         if (data?.is_superuser && impersonatedTenantId.value) {
             const { data: tenantData } = await supabase
                 .from('tenants')
@@ -85,18 +110,18 @@ export function useAuth() {
         await supabase.auth.signOut()
         user.value = null
         userProfile.value = null
-        // Clear impersonation on sign out
+        // Clear all impersonation on sign out
         stopImpersonating()
+        stopImpersonatingUser()
     }
 
-    // Impersonation functions
+    // === TENANT IMPERSONATION FUNCTIONS ===
     const impersonateTenant = async (tenantId) => {
         if (!userProfile.value?.is_superuser) return
 
         localStorage.setItem('impersonated_tenant_id', tenantId)
         impersonatedTenantId.value = tenantId
 
-        // Fetch tenant name
         const { data: tenantData } = await supabase
             .from('tenants')
             .select('name')
@@ -104,7 +129,6 @@ export function useAuth() {
             .single()
         impersonatedTenantName.value = tenantData?.name || 'Unknown Tenant'
 
-        // Reload the page to refresh all data with new tenant context
         location.reload()
     }
 
@@ -113,8 +137,32 @@ export function useAuth() {
         impersonatedTenantId.value = null
         impersonatedTenantName.value = null
 
-        // Reload if we were impersonating
         if (userProfile.value?.is_superuser) {
+            location.reload()
+        }
+    }
+
+    // === USER IMPERSONATION FUNCTIONS ===
+    const impersonateUser = async (userId, userName) => {
+        if (!isTenantAdmin.value) return
+        if (userId === user.value?.id) return // Can't impersonate yourself
+
+        localStorage.setItem('impersonated_user_id', userId)
+        localStorage.setItem('impersonated_user_name', userName)
+        impersonatedUserId.value = userId
+        impersonatedUserName.value = userName
+
+        location.reload()
+    }
+
+    const stopImpersonatingUser = () => {
+        const wasImpersonating = !!impersonatedUserId.value
+        localStorage.removeItem('impersonated_user_id')
+        localStorage.removeItem('impersonated_user_name')
+        impersonatedUserId.value = null
+        impersonatedUserName.value = null
+
+        if (wasImpersonating) {
             location.reload()
         }
     }
@@ -126,12 +174,20 @@ export function useAuth() {
         initAuth,
         signIn,
         signOut,
-        // Impersonation
+        // Tenant Impersonation (Superuser)
         isImpersonating,
         impersonatedTenantId,
         effectiveTenantId,
         effectiveTenantName,
         impersonateTenant,
-        stopImpersonating
+        stopImpersonating,
+        // User Impersonation (Tenant Admin)
+        isTenantAdmin,
+        isImpersonatingUser,
+        impersonatedUserId,
+        impersonatedUserName,
+        effectiveUserId,
+        impersonateUser,
+        stopImpersonatingUser
     }
 }
