@@ -1,3 +1,4 @@
+<script setup>
 import { ref, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { Plus, Eye, Mail, Shield, UserCircle } from 'lucide-vue-next'
