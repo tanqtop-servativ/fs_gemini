@@ -20,7 +20,7 @@ const initials = computed(() => {
   <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-200">
         
-        <div class="p-6">
+        <div class="p-6 overflow-y-auto flex-1">
              <div class="flex justify-between items-start mb-6">
                 <div class="flex items-center gap-4">
                     <div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-xl font-bold text-slate-500 border-2 border-white shadow-sm">
