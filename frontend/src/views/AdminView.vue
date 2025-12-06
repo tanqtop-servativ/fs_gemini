@@ -6,7 +6,7 @@ import { Plus, Eye, VenetianMask, ShieldAlert } from 'lucide-vue-next'
 import TenantFormModal from '../components/admin/TenantFormModal.vue'
 import TenantDetailModal from '../components/admin/TenantDetailModal.vue'
 
-const { userProfile, loading: authLoading } = useAuth()
+const { userProfile, loading: authLoading, isImpersonating, effectiveTenantName, impersonateTenant, stopImpersonating } = useAuth()
 const tenants = ref([])
 const loading = ref(true)
 
@@ -16,6 +16,10 @@ const showDetail = ref(false)
 const selectedTenant = ref(null)
 
 const isSuperuser = computed(() => userProfile.value?.is_superuser)
+
+const handleSwitch = async (tenantId) => {
+    await impersonateTenant(tenantId)
+}
 
 const fetchData = async () => {
     loading.value = true
@@ -83,6 +87,22 @@ const handleSaved = () => {
         </button>
         </div>
 
+        <!-- Impersonation Banner -->
+        <div v-if="isImpersonating" class="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-100 p-2 rounded-full text-amber-600">
+                    <VenetianMask class="w-5 h-5" />
+                </div>
+                <div>
+                    <div class="font-bold text-amber-900">Impersonating: {{ effectiveTenantName }}</div>
+                    <div class="text-xs text-amber-700">You are viewing the system as if you belong to this tenant.</div>
+                </div>
+            </div>
+            <button @click="stopImpersonating" class="bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 px-4 py-2 rounded font-bold text-sm shadow-sm transition-colors">
+                Stop Impersonating
+            </button>
+        </div>
+
         <!-- Table -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 overflow-y-auto">
         <table class="w-full text-left border-collapse">
@@ -110,7 +130,10 @@ const handleSaved = () => {
                 <!-- Created -->
                 <td class="px-6 py-4 text-gray-500 text-sm">{{ new Date(t.created_at).toLocaleDateString() }}</td>
                 <!-- Actions -->
-                <td class="px-6 py-4 text-right" @click.stop>
+                <td class="px-6 py-4 text-right flex justify-end gap-2" @click.stop>
+                    <button @click="handleSwitch(t.id)" class="text-indigo-600 hover:text-indigo-800 transition-colors font-bold text-xs border border-indigo-200 rounded bg-indigo-50 hover:bg-indigo-100 px-2 py-1">
+                        Switch
+                    </button>
                     <button @click="openDetail(t)" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition">
                         <Eye size="16" />
                     </button>

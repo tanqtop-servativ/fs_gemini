@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { signOut, userProfile, user } = useAuth()
+const { signOut, userProfile, user, isImpersonating, effectiveTenantName } = useAuth()
 
 const isSuperuser = computed(() => userProfile.value?.is_superuser)
 
@@ -65,9 +65,12 @@ const handleLogout = async () => {
       </button>
       
       <!-- User Info -->
-      <div v-if="userProfile" class="mt-3 px-4 text-xs text-slate-400 space-y-0.5">
+      <div v-if="userProfile" class="mt-3 px-4 text-xs space-y-0.5">
         <div class="font-medium text-slate-600 truncate">{{ user?.email }}</div>
-        <div class="truncate">{{ userProfile.tenants?.name || 'No Tenant' }}</div>
+        <div :class="isImpersonating ? 'text-amber-600 font-bold' : 'text-slate-400'" class="truncate">
+          {{ effectiveTenantName }}
+          <span v-if="isImpersonating" class="text-[10px]">(impersonating)</span>
+        </div>
       </div>
     </div>
   </aside>
