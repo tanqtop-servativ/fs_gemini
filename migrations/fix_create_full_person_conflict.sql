@@ -37,8 +37,8 @@ BEGIN
 
     -- 2. Create Profile (if user_id is provided)
     IF p_user_id IS NOT NULL THEN
-        INSERT INTO profiles (id, first_name, last_name, email, role, tenant_id)
-        VALUES (p_user_id, p_first_name, p_last_name, p_email, p_role, p_tenant_id)
+        INSERT INTO profiles (id, first_name, last_name, tenant_id)
+        VALUES (p_user_id, p_first_name, p_last_name, p_tenant_id)
         RETURNING id INTO v_profile_id;
     END IF;
 
