@@ -63,6 +63,12 @@ const handleLogout = async () => {
         <LogOut size="20" />
         <span class="font-medium">Sign Out</span>
       </button>
+      
+      <!-- User Info -->
+      <div v-if="userProfile" class="mt-3 px-4 text-xs text-slate-400 space-y-0.5">
+        <div class="font-medium text-slate-600 truncate">{{ userProfile.email }}</div>
+        <div class="truncate">{{ userProfile.tenants?.name || 'No Tenant' }}</div>
+      </div>
     </div>
   </aside>
 </template>

@@ -31,7 +31,7 @@ export function useAuth() {
     const fetchProfile = async (userId) => {
         const { data } = await supabase
             .from('profiles')
-            .select('*')
+            .select('*, tenants:tenant_id(name)')
             .eq('id', userId)
             .single()
         userProfile.value = data
