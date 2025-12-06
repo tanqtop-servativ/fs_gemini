@@ -28,6 +28,7 @@ const fetchData = async () => {
         .from('service_templates')
         .select('*, service_workflow_steps(*, job_templates(name))')
         .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .order('name')
 
     templates.value = data || []

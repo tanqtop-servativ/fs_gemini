@@ -108,6 +108,7 @@ export function useServiceTemplates() {
             .from('service_templates')
             .select('*, service_workflow_steps(*, job_templates(name))')
             .eq('id', templateId)
+            .is('deleted_at', null)
             .single()
 
         if (error) {

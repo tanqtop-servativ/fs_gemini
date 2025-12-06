@@ -10,7 +10,7 @@ import {
 } from 'lucide-vue-next'
 
 const { userProfile } = useAuth()
-const { saveProperty } = useProperties()
+const { saveProperty, deleteProperty } = useProperties()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -18,6 +18,23 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+
+// Logic: Archive
+const handleDelete = async () => {
+    if (!confirm("Are you sure you want to archive this property? It will be hidden from lists.")) return
+    
+    saving.value = true
+    try {
+        const result = await deleteProperty(props.property.id)
+        if (!result.success) throw new Error(result.error)
+        emit('saved')
+        emit('close')
+    } catch (e) {
+        alert("Archive failed: " + e.message)
+    } finally {
+        saving.value = false
+    }
+}
 
 // Component State
 const loading = ref(false)
@@ -392,7 +409,7 @@ const saveData = async () => {
       
       <!-- Footer -->
       <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-        <button v-if="property" class="text-red-500 text-sm flex items-center gap-2 hover:bg-red-50 px-3 py-2 rounded">
+        <button v-if="property" @click="handleDelete" class="text-red-500 text-sm flex items-center gap-2 hover:bg-red-50 px-3 py-2 rounded">
              <Trash2 size="16"/> Archive
         </button>
         <div v-else></div> <!-- Spacer -->

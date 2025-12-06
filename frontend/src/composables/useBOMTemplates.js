@@ -85,6 +85,7 @@ export function useBOMTemplates() {
             .from('bom_templates')
             .select('*, bom_template_items(*)')
             .eq('id', templateId)
+            .is('deleted_at', null)
             .single()
 
         if (error) {

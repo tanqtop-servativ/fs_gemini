@@ -18,7 +18,7 @@ const steps = computed(() => {
 
 const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this service template?")) return
-    const { error } = await supabase.from('service_templates').delete().eq('id', props.template.id)
+    const { error } = await supabase.from('service_templates').update({ deleted_at: new Date().toISOString() }).eq('id', props.template.id)
     if (error) alert("Error: " + error.message)
     else {
         emit('refresh')

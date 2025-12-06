@@ -26,6 +26,7 @@ const fetchJob = async () => {
             service:service_opportunity_id(service_template_id)
         `)
         .eq('id', jobId.value)
+        .is('deleted_at', null)
         .single()
     
     if (error) {
