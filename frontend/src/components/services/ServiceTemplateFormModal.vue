@@ -2,6 +2,7 @@
 import { ref, watch, reactive, computed } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../composables/useAuth'
+import { useServiceTemplates } from '../../composables/useServiceTemplates'
 import { X, Save, Plus, GripVertical, Trash2, GitMerge } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 
@@ -17,6 +18,7 @@ const saving = ref(false)
 const jobTemplates = ref([])
 
 const { effectiveTenantId } = useAuth()
+const { saveTemplate } = useServiceTemplates()
 
 // Form
 const form = reactive({
@@ -95,47 +97,14 @@ const handleSave = async () => {
     saving.value = true
 
     try {
-        const tenantId = effectiveTenantId.value
-        if (!tenantId) throw new Error("Tenant ID not found")
-
-        // Upsert Template
-        const payload = {
+        const result = await saveTemplate({
+            id: props.template?.id,
             name: form.name,
             description: form.description,
-            tenant_id: tenantId
-        }
+            steps: form.steps
+        })
 
-        let stId = props.template?.id
-        let error
-
-        if (stId) {
-             const { error: e } = await supabase.from('service_templates').update(payload).eq('id', stId)
-             error = e
-        } else {
-             const { data, error: e } = await supabase.from('service_templates').insert(payload).select().single()
-             error = e
-             if (data) stId = data.id
-        }
-
-        if (error) throw error
-
-        // Sync Steps: Delete all and re-insert
-        // NOTE: This assumes we don't care about preserving step IDs (which we generally don't for simple workflows)
-        await supabase.from('service_workflow_steps').delete().eq('service_template_id', stId)
-
-        if (form.steps.length > 0) {
-            const stepRows = form.steps.map((s, idx) => ({
-                tenant_id: tenantId,
-                service_template_id: stId,
-                job_template_id: s.job_template_id,
-                sort_order: idx,
-                is_optional: s.is_optional,
-                is_billing: s.is_billing,
-                delay_hours: s.delay_hours
-            }))
-            const { error: eSteps } = await supabase.from('service_workflow_steps').insert(stepRows)
-            if (eSteps) throw eSteps
-        }
+        if (!result.success) throw new Error(result.error)
 
         emit('saved')
         emit('close')
