@@ -35,7 +35,7 @@ const handleLogout = async () => {
   <aside class="w-64 bg-white text-slate-900 flex flex-col h-full border-r border-gray-200">
     <div class="p-6">
       <h1 class="text-xl font-bold flex items-center gap-2 text-slate-900">
-        <Shield class="w-6 h-6 text-slate-900" />
+        <img src="/logo.png" alt="ServativPro" class="w-8 h-8 rounded" />
         ServativPro
       </h1>
     </div>
