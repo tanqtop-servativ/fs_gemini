@@ -12,6 +12,7 @@ import 'tippy.js/dist/tippy.css'
 import 'tippy.js/themes/light-border.css'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../composables/useAuth'
+import CalendarEventModal from '../components/calendar/CalendarEventModal.vue'
 
 // Refs for UI state
 const route = useRoute()
@@ -20,6 +21,10 @@ const selectedPropId = ref('all')
 const selectedView = ref('multiMonthYear') // Matches value in dropdown option
 const selectedMonths = ref(1)
 const properties = ref([])
+
+// Modal state
+const showEventModal = ref(false)
+const selectedEvent = ref(null)
 
 // Zoom Control via CSS Transform
 const zoomScale = ref(100) // Percentage: 70% to 130%
@@ -117,6 +122,10 @@ const calendarOptions = {
       allowHTML: true,
       theme: 'light-border'
     })
+  },
+  eventClick: (info) => {
+    selectedEvent.value = info.event
+    showEventModal.value = true
   }
 }
 
@@ -144,8 +153,13 @@ const fetchEvents = async () => {
   if (!calApi) return
   
   let query = supabase.from('master_calendar').select('*')
+  
   if (selectedPropId.value !== 'all') {
+    // Specific property: show ALL events (including iCal bookings)
     query = query.eq('property_id', selectedPropId.value)
+  } else {
+    // All Properties: show only Jobs/Services, exclude iCal bookings to keep view manageable
+    query = query.neq('event_type', 'Booking')
   }
   
   const { data, error } = await query
@@ -165,7 +179,9 @@ const fetchEvents = async () => {
     extendedProps: {
       description: evt.description,
       property_name: evt.property_name,
-      property_address: evt.property_address
+      property_address: evt.property_address,
+      event_type: evt.event_type,
+      code: evt.code
     }
   }))
   
@@ -190,7 +206,7 @@ onMounted(() => {
     }
 })
 const pageTitle = computed(() => {
-    if (selectedPropId.value === 'all') return 'Master Calendar'
+    if (selectedPropId.value === 'all') return 'Work Calendar'
     const prop = properties.value.find(p => p.id === selectedPropId.value)
     return prop ? `Property Calendar: ${prop.name}` : 'Property Calendar'
 })
@@ -205,7 +221,7 @@ const pageTitle = computed(() => {
       <div class="flex gap-2 items-center">
         <!-- Property Selector -->
         <select v-model="selectedPropId" class="border border-gray-300 rounded-lg p-2 text-sm bg-white min-w-[200px]">
-          <option value="all">All Properties</option>
+          <option value="all">All Work</option>
           <option v-for="p in properties" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
         
@@ -246,6 +262,13 @@ const pageTitle = computed(() => {
         <FullCalendar ref="calendarRef" :options="calendarOptions" />
       </div>
     </div>
+
+    <!-- Event Detail Modal -->
+    <CalendarEventModal 
+      :isOpen="showEventModal" 
+      :event="selectedEvent" 
+      @close="showEventModal = false" 
+    />
   </div>
 </template>
 
