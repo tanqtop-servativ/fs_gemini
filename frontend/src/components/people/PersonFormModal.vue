@@ -119,8 +119,8 @@ const handleSave = async () => {
                  p_last_name: form.last_name,
                  p_email: form.email,
                  p_phone: null,
-                 p_role: 'user', // default role
                  p_tenant_id: tenantId,
+                 p_role: 'user', // default role (optional param)
                  p_user_id: userId
              })
              
