@@ -1,0 +1,254 @@
+<script setup>
+import { ref, watch, reactive, computed } from 'vue'
+import { supabase } from '../../lib/supabase'
+import { X, Save, Plus, GripVertical, Trash2, GitMerge } from 'lucide-vue-next'
+import draggable from 'vuedraggable'
+
+const props = defineProps({
+  isOpen: Boolean,
+  template: Object
+})
+
+const emit = defineEmits(['close', 'saved'])
+
+const loading = ref(false)
+const saving = ref(false)
+const jobTemplates = ref([])
+
+// Form
+const form = reactive({
+    name: '',
+    description: '',
+    steps: [] // { job_template_id, is_optional, is_billing, delay_hours, sort_order, _tempId }
+})
+
+// Fetch Job Templates for dropdown
+const fetchJobTemplates = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const tenantId = session?.user?.user_metadata?.tenant_id
+    if (!tenantId) return
+
+    const { data } = await supabase
+        .from('job_templates')
+        .select('id, name')
+        .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
+        .order('name')
+    
+    jobTemplates.value = data || []
+}
+
+watch(() => props.isOpen, (open) => {
+    if (open) {
+        fetchJobTemplates()
+        if (props.template) {
+            form.name = props.template.name
+            form.description = props.template.description || ''
+            // Deep copy steps
+            form.steps = (props.template.service_workflow_steps || [])
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((s, idx) => ({
+                    ...s,
+                    _tempId: idx // tracking for draggable key
+                }))
+        } else {
+            resetForm()
+        }
+    }
+})
+
+const resetForm = () => {
+    form.name = ''
+    form.description = ''
+    form.steps = []
+}
+
+// Logic
+const addStep = (e) => {
+    const jId = e.target.value
+    if (!jId) return
+    
+    // Find job name for potential lookup, but we store ID
+    form.steps.push({
+        job_template_id: jId,
+        is_optional: false,
+        is_billing: false,
+        delay_hours: 0,
+        _tempId: Date.now() + Math.random()
+    })
+    e.target.value = "" // Reset select
+}
+
+const removeStep = (index) => {
+    form.steps.splice(index, 1)
+}
+
+const getJobName = (id) => {
+    const j = jobTemplates.value.find(x => x.id == id)
+    return j ? j.name : 'Unknown Job'
+}
+
+const handleSave = async () => {
+    if (!form.name) return alert("Service Name required")
+    saving.value = true
+
+    try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const tenantId = session?.user?.user_metadata?.tenant_id
+
+        // Upsert Template
+        const payload = {
+            name: form.name,
+            description: form.description,
+            tenant_id: tenantId
+        }
+
+        let stId = props.template?.id
+        let error
+
+        if (stId) {
+             const { error: e } = await supabase.from('service_templates').update(payload).eq('id', stId)
+             error = e
+        } else {
+             const { data, error: e } = await supabase.from('service_templates').insert(payload).select().single()
+             error = e
+             if (data) stId = data.id
+        }
+
+        if (error) throw error
+
+        // Sync Steps: Delete all and re-insert
+        // NOTE: This assumes we don't care about preserving step IDs (which we generally don't for simple workflows)
+        await supabase.from('service_workflow_steps').delete().eq('service_template_id', stId)
+
+        if (form.steps.length > 0) {
+            const stepRows = form.steps.map((s, idx) => ({
+                tenant_id: tenantId,
+                service_template_id: stId,
+                job_template_id: s.job_template_id,
+                sort_order: idx,
+                is_optional: s.is_optional,
+                is_billing: s.is_billing,
+                delay_hours: s.delay_hours
+            }))
+            const { error: eSteps } = await supabase.from('service_workflow_steps').insert(stepRows)
+            if (eSteps) throw eSteps
+        }
+
+        emit('saved')
+        emit('close')
+
+    } catch (e) {
+        alert("Error saving: " + e.message)
+    } finally {
+        saving.value = false
+    }
+}
+</script>
+
+<template>
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-200">
+        
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+            <h3 class="font-bold text-lg text-slate-900">{{ template ? 'Edit Workflow' : 'New Service Workflow' }}</h3>
+            <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+        </div>
+
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+            
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
+                 <div>
+                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Service Name</label>
+                     <input v-model="form.name" class="w-full border p-2 rounded text-lg font-bold focus:ring-1 focus:ring-blue-500" placeholder="e.g. Standard Turnover">
+                 </div>
+                 <div>
+                     <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Description</label>
+                     <textarea v-model="form.description" class="w-full border p-2 rounded text-sm h-16 resize-none" placeholder="Is this for Turnovers? Warranty?"></textarea>
+                 </div>
+            </div>
+
+            <!-- Steps -->
+            <div>
+                 <div class="flex justify-between items-center mb-2">
+                     <h4 class="font-bold text-slate-700 uppercase text-sm flex items-center gap-2">
+                         <GitMerge size="16" class="text-blue-500"/> Workflow Steps
+                     </h4>
+                 </div>
+
+                 <draggable 
+                    v-model="form.steps" 
+                    item-key="_tempId" 
+                    handle=".drag-handle"
+                    class="space-y-3"
+                    ghost-class="opacity-50"
+                 >
+                    <template #item="{ element: step, index }">
+                        <div class="bg-white rounded-lg border border-gray-200 shadow-sm flex items-start p-3 group">
+                            <!-- Handle -->
+                            <div class="mt-2 mr-3 cursor-grab active:cursor-grabbing drag-handle text-gray-300 hover:text-gray-500">
+                                <GripVertical size="20" />
+                            </div>
+                            
+                            <!-- Index -->
+                            <div class="mt-2 text-sm font-bold text-gray-300 w-6 text-center select-none">{{ index + 1 }}</div>
+
+                            <!-- Content -->
+                            <div class="flex-1 ml-2">
+                                <div class="font-bold text-slate-800 text-sm mb-2">{{ getJobName(step.job_template_id) }}</div>
+                                
+                                <div class="flex flex-wrap gap-4 items-center">
+                                    <label class="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer">
+                                        <input type="checkbox" v-model="step.is_optional" class="rounded text-blue-600 focus:ring-0"> Optional
+                                    </label>
+                                    <label class="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer">
+                                        <input type="checkbox" v-model="step.is_billing" class="rounded text-green-600 focus:ring-0"> Billing Event
+                                    </label>
+                                    <div class="flex items-center gap-2 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                        <span class="text-[10px] uppercase font-bold text-gray-400">Delay</span>
+                                        <input v-model.number="step.delay_hours" type="number" min="0" class="w-10 text-center text-xs border rounded p-0.5" placeholder="0">
+                                        <span class="text-xs text-gray-400">hrs</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Delete -->
+                            <button @click="removeStep(index)" class="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition">
+                                <Trash2 size="16" />
+                            </button>
+                        </div>
+                    </template>
+                 </draggable>
+                 
+                 <!-- Empty State -->
+                 <div v-if="form.steps.length === 0" class="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg mt-2">
+                     <p class="text-gray-400 text-xs italic">No job steps defined yet.</p>
+                 </div>
+
+                 <!-- Add Step -->
+                 <div class="mt-4 p-3 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center gap-3">
+                     <Plus size="16" class="text-blue-500"/>
+                     <select @change="addStep" class="flex-1 text-sm border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white">
+                         <option value="">Add Job Template as Step...</option>
+                         <option v-for="j in jobTemplates" :key="j.id" :value="j.id">{{ j.name }}</option>
+                     </select>
+                 </div>
+
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+            <button @click="$emit('close')" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
+            <button @click="handleSave" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center transition disabled:opacity-50">
+                <Save size="16" class="mr-2" />
+                {{ saving ? 'Saving...' : 'Save Workflow' }}
+            </button>
+        </div>
+
+    </div>
+  </div>
+</template>
