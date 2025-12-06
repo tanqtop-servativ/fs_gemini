@@ -21,6 +21,26 @@ const selectedView = ref('multiMonthYear') // Matches value in dropdown option
 const selectedMonths = ref(1)
 const properties = ref([])
 
+// Zoom Control via CSS Transform
+const zoomScale = ref(100) // Percentage: 70% to 130%
+const MIN_ZOOM = 70
+const MAX_ZOOM = 130
+const ZOOM_STEP = 10
+
+const zoomIn = () => { zoomScale.value = Math.min(zoomScale.value + ZOOM_STEP, MAX_ZOOM) }
+const zoomOut = () => { zoomScale.value = Math.max(zoomScale.value - ZOOM_STEP, MIN_ZOOM) }
+
+// Computed style for the calendar wrapper
+const calendarWrapperStyle = computed(() => {
+  const scale = zoomScale.value / 100
+  return {
+    transform: `scale(${scale})`,
+    transformOrigin: 'top left',
+    width: `${100 / scale}%`,
+    height: `${100 / scale}%`
+  }
+})
+
 // Helper to resolve view name based on selection
 const resolveViewName = (view, months) => {
   if (view === 'multiMonthYear') {
@@ -54,11 +74,11 @@ const calendarOptions = {
   slotMaxTime: '22:00:00',
   views: {
     multiMonth1: { type: 'dayGridMonth', duration: { months: 1 }, showNonCurrentDates: true },
-    multiMonth2: { type: 'multiMonthYear', duration: { months: 2 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
-    multiMonth3: { type: 'multiMonthYear', duration: { months: 3 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
-    multiMonth4: { type: 'multiMonthYear', duration: { months: 4 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
-    multiMonth5: { type: 'multiMonthYear', duration: { months: 5 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
-    multiMonth6: { type: 'multiMonthYear', duration: { months: 6 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
+    multiMonth2: { type: 'multiMonthYear', duration: { months: 2 }, multiMonthMaxColumns: 2, showNonCurrentDates: false },
+    multiMonth3: { type: 'multiMonthYear', duration: { months: 3 }, multiMonthMaxColumns: 3, showNonCurrentDates: false },
+    multiMonth4: { type: 'multiMonthYear', duration: { months: 4 }, multiMonthMaxColumns: 2, showNonCurrentDates: false },
+    multiMonth5: { type: 'multiMonthYear', duration: { months: 5 }, multiMonthMaxColumns: 3, showNonCurrentDates: false },
+    multiMonth6: { type: 'multiMonthYear', duration: { months: 6 }, multiMonthMaxColumns: 3, showNonCurrentDates: false },
   },
   events: [], // Will be populated
   eventContent: (arg) => {
@@ -90,9 +110,9 @@ const calendarOptions = {
     tippy(info.el, {
       content: `
         <div class="font-bold">${info.event.title}</div>
-        <div class="text-xs text-blue-200 border-b border-white/20 pb-1 mb-1">${timeStr}</div>
+        <div class="text-xs text-gray-600 border-b border-gray-200 pb-1 mb-1">${timeStr}</div>
         <div class="text-xs">${props.property_name || ''}</div>
-        <div class="text-[10px] opacity-75">${props.property_address || ''}</div>
+        <div class="text-[10px] text-gray-500">${props.property_address || ''}</div>
       `,
       allowHTML: true,
       theme: 'light-border'
@@ -208,12 +228,23 @@ const pageTitle = computed(() => {
           <option :value="5">5 Months</option>
           <option :value="6">6 Months</option>
         </select>
+
+        <div class="border-l border-gray-300 h-6 mx-2"></div>
+
+        <!-- Zoom Control -->
+        <div class="flex items-center gap-1" title="Zoom In/Out">
+          <button @click="zoomOut" class="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 font-bold text-sm" :disabled="zoomScale <= MIN_ZOOM">−</button>
+          <span class="text-xs text-gray-500 w-10 text-center">{{ zoomScale }}%</span>
+          <button @click="zoomIn" class="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-600 font-bold text-sm" :disabled="zoomScale >= MAX_ZOOM">+</button>
+        </div>
       </div>
     </div>
     
     <!-- Calendar -->
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex-1 overflow-hidden">
-      <FullCalendar ref="calendarRef" :options="calendarOptions" />
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex-1 overflow-auto">
+      <div :style="calendarWrapperStyle" class="min-w-max">
+        <FullCalendar ref="calendarRef" :options="calendarOptions" />
+      </div>
     </div>
   </div>
 </template>
@@ -225,5 +256,50 @@ const pageTitle = computed(() => {
   border: 1px solid #e5e7eb;
   color: #374151;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+/* Compact Calendar Styling - Uses dynamic --row-height from parent */
+:deep(.fc) {
+  --fc-daygrid-day-min-height: var(--row-height, 60px);
+}
+
+:deep(.fc .fc-daygrid-day) {
+  min-height: var(--row-height, 60px) !important;
+}
+
+:deep(.fc .fc-daygrid-day-frame) {
+  min-height: calc(var(--row-height, 60px) - 5px) !important;
+}
+
+/* Smaller day numbers */
+:deep(.fc .fc-daygrid-day-number) {
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+/* Compact events */
+:deep(.fc .fc-daygrid-event) {
+  font-size: 10px;
+  padding: 1px 2px;
+  margin-bottom: 1px;
+}
+
+/* Compact multi-month headers */
+:deep(.fc .fc-multimonth-header) {
+  padding: 4px 0;
+}
+
+:deep(.fc .fc-multimonth-title) {
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+/* Multi-month view also uses --row-height */
+:deep(.fc .fc-multimonth-daygrid) {
+  --fc-daygrid-day-min-height: var(--row-height, 50px);
+}
+
+:deep(.fc .fc-multimonth .fc-daygrid-day) {
+  min-height: var(--row-height, 50px) !important;
 }
 </style>
