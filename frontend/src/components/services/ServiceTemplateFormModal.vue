@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, reactive, computed } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../composables/useAuth'
 import { X, Save, Plus, GripVertical, Trash2, GitMerge } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 
@@ -15,6 +16,8 @@ const loading = ref(false)
 const saving = ref(false)
 const jobTemplates = ref([])
 
+const { effectiveTenantId } = useAuth()
+
 // Form
 const form = reactive({
     name: '',
@@ -24,8 +27,7 @@ const form = reactive({
 
 // Fetch Job Templates for dropdown
 const fetchJobTemplates = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const tenantId = session?.user?.user_metadata?.tenant_id
+    const tenantId = effectiveTenantId.value
     if (!tenantId) return
 
     const { data } = await supabase
@@ -93,8 +95,8 @@ const handleSave = async () => {
     saving.value = true
 
     try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const tenantId = session?.user?.user_metadata?.tenant_id
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) throw new Error("Tenant ID not found")
 
         // Upsert Template
         const payload = {
