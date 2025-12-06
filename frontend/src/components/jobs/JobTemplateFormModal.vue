@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, reactive } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useJobTemplates } from '../../composables/useJobTemplates'
 import { X, Save, Plus, GripVertical, Trash2, Book, CheckSquare, PenTool } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 import TaskLibraryModal from './TaskLibraryModal.vue'
@@ -11,6 +12,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+
+// Composables
+const { saveTemplate, archiveTemplate, restoreTemplate } = useJobTemplates()
 
 const saving = ref(false)
 const showLibrary = ref(false)
@@ -98,31 +102,16 @@ const handleSave = async () => {
     saving.value = true
 
     try {
-        const payload = {
-            p_name: form.name,
-            p_description: form.description,
-            p_name_es: form.name_es,
-            p_description_es: form.description_es,
-            p_tasks: form.tasks.map((t, idx) => ({
-                ...t,
-                sort_order: idx, // Ensure sort order is synced with UI array order
-                checklist: t.checklist.map((c, cIdx) => ({
-                    ...c,
-                    sort_order: cIdx
-                }))
-            }))
-        }
+        const result = await saveTemplate({
+            id: props.template?.id,
+            name: form.name,
+            name_es: form.name_es,
+            description: form.description,
+            description_es: form.description_es,
+            tasks: form.tasks
+        })
 
-        let error
-        if (props.template) {
-            const { error: err } = await supabase.rpc('update_job_template', { ...payload, p_id: props.template.id })
-            error = err
-        } else {
-            const { error: err } = await supabase.rpc('create_job_template', payload)
-            error = err
-        }
-
-        if (error) throw error
+        if (!result.success) throw new Error(result.error)
         
         emit('saved')
         emit('close')
@@ -137,18 +126,17 @@ const handleSave = async () => {
 
 const handleArchive = async () => {
     if (!confirm("Archive this template?")) return
-    const { error } = await supabase.from('job_templates').update({ deleted_at: new Date().toISOString() }).eq('id', props.template.id)
-    if (error) alert(error.message)
+    const result = await archiveTemplate(props.template.id)
+    if (!result.success) alert(result.error)
     else { emit('saved'); emit('close'); }
 }
 
 const handleRestore = async () => {
     if (!confirm("Restore this template?")) return
-    const { error } = await supabase.from('job_templates').update({ deleted_at: null }).eq('id', props.template.id)
-    if (error) alert(error.message)
+    const result = await restoreTemplate(props.template.id)
+    if (!result.success) alert(result.error)
     else { emit('saved'); emit('close'); }
 }
-
 </script>
 
 <template>
