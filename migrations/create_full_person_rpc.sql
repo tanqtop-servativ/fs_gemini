@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.create_full_person(
     p_last_name text,
     p_email text,
     p_phone text,
-    p_role text,
+    p_role text DEFAULT 'user',
     p_tenant_id uuid,
     p_user_id uuid DEFAULT NULL
 )
@@ -25,9 +25,9 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'A person with this email already exists in your organization.');
     END IF;
 
-    -- 1. Create Person
-    INSERT INTO people (first_name, last_name, email, phone, role, tenant_id, user_id)
-    VALUES (p_first_name, p_last_name, p_email, p_phone, p_role, p_tenant_id, p_user_id)
+    -- 1. Create Person (roles are handled separately via person_roles table)
+    INSERT INTO people (first_name, last_name, email, phone, tenant_id, user_id)
+    VALUES (p_first_name, p_last_name, p_email, p_phone, p_tenant_id, p_user_id)
     RETURNING id INTO v_person_id;
 
     -- 2. Create Profile (if user_id is provided)
