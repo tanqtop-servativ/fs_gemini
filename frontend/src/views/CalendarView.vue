@@ -17,7 +17,7 @@ import { useAuth } from '../composables/useAuth'
 const route = useRoute()
 const calendarRef = ref(null)
 const selectedPropId = ref('all')
-const selectedView = ref('multiMonth1') // Default internally maps to 'multiMonth1'
+const selectedView = ref('multiMonthYear') // Matches value in dropdown option
 const selectedMonths = ref(1)
 const properties = ref([])
 
@@ -106,7 +106,12 @@ const { userProfile } = useAuth()
 const fetchProperties = async () => {
     // Rely on RLS, but ensure auth is ready
     if (!userProfile.value) return
-    const { data } = await supabase.from('properties').select('id, name').eq('status', 'active')
+    const { data } = await supabase
+        .from('properties')
+        .select('id, name')
+        .eq('status', 'active')
+        .is('deleted_at', null)
+        
     if (data) properties.value = data
 }
 
