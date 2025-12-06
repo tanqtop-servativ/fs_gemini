@@ -3,12 +3,14 @@ import { ref, watch, reactive } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { uploadFile } from '../../lib/upload'
 import { useAuth } from '../../composables/useAuth'
+import { useProperties } from '../../composables/useProperties'
 import { 
   X, Save, Trash2, Upload, Plus, RotateCcw, 
   Wifi, Key, Home, Image as ImageIcon 
 } from 'lucide-vue-next'
 
 const { userProfile } = useAuth()
+const { saveProperty } = useProperties()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -204,59 +206,17 @@ const saveData = async () => {
   }
   
   saving.value = true
-  
-  const payload = {
-    p_name: form.name,
-    p_address: form.address,
-    p_hcp_cust: form.hcp_cust,
-    p_hcp_addr: form.hcp_addr,
-    p_checkin: form.checkin,
-    p_checkout: form.checkout,
-    p_time_zone: form.timezone,
-    p_is_dst: form.is_dst,
-    p_owner_ids: form.owner_ids,
-    p_manager_ids: form.manager_ids,
-    p_photo_url: form.front_photo_url,
-    p_door_code: form.door_code,
-    p_garage_code: form.garage_code,
-    p_gate_code: form.gate_code,
-    p_closet_code: form.closet_code,
-    p_wifi_network: form.wifi_network,
-    p_wifi_password: form.wifi_password,
-    p_bedrooms: form.bedrooms,
-    p_bathrooms: form.bathrooms,
-    p_max_guests: form.max_guests,
-    p_square_footage: form.sq_ft,
-    p_bathroom_sinks: form.sinks,
-    p_bath_mats: form.baths_mats,
-    p_has_pool: form.has_pool,
-    p_has_bbq: form.has_bbq,
-    p_allows_pets: form.allows_pets,
-    p_has_casita: form.has_casita,
-    p_casita_code: form.casita_code,
-    p_parking_instructions: form.parking,
-    p_feeds: feeds.value.map(f => ({ id: f.id, name: f.name, url: f.url })),
-    p_inventory: inventory.value
-  }
-  
-  // Get tenant_id from userProfile (fetched at login)
-  const tenantId = userProfile.value?.tenant_id
-  if (!tenantId) {
-    return alert("Unable to determine tenant. Please log out and log back in.")
-  }
-  payload.p_tenant_id = tenantId
+
 
   try {
-    let error
-    if (props.property) {
-      const res = await supabase.rpc('update_property_safe', { ...payload, p_id: props.property.id })
-      error = res.error
-    } else {
-      const res = await supabase.rpc('create_property_safe', { ...payload })
-      error = res.error
-    }
+    const result = await saveProperty({
+      id: props.property?.id,
+      details: form,
+      feeds: feeds.value,
+      inventory: inventory.value
+    })
     
-    if (error) throw error
+    if (!result.success) throw new Error(result.error)
     emit('saved')
     emit('close')
   } catch (e) {
