@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useAuth } from './composables/useAuth'
 import Sidebar from './components/Sidebar.vue'
+import AppHeader from './components/AppHeader.vue'
 
 const { initAuth, user, loading } = useAuth()
 
@@ -21,8 +22,11 @@ onMounted(() => {
 
   <div v-else class="flex h-screen bg-slate-50 text-slate-900 overflow-hidden">
     <Sidebar />
-    <main class="flex-1 overflow-auto relative">
-      <router-view />
+    <main class="flex-1 flex flex-col overflow-hidden relative">
+      <AppHeader />
+      <div class="flex-1 overflow-auto p-0">
+          <router-view />
+      </div>
     </main>
   </div>
 </template>
