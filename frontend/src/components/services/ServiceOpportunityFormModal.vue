@@ -1,7 +1,6 @@
 <script setup>
 import { ref, watch, reactive, onMounted } from 'vue'
-import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../composables/useAuth'
+import { useServiceOpportunities } from '../../composables/useServiceOpportunities'
 import { X, Save, Calendar, Building, FileText, Smartphone } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -11,13 +10,15 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saved'])
 
+// Composables
+const { saveOpportunity, deleteOpportunity, fetchFormOptions } = useServiceOpportunities()
+
 const loading = ref(false)
 const saving = ref(false)
 
 // Data
 const properties = ref([])
 const serviceTemplates = ref([])
-const { effectiveTenantId } = useAuth()
 
 // Form
 const form = reactive({
@@ -32,16 +33,11 @@ const today = new Date().toISOString().split('T')[0]
 
 // Fetch Data
 const fetchOptions = async () => {
-    const tenantId = effectiveTenantId.value
-    if (!tenantId) return
-
-    const [propsData, servData] = await Promise.all([
-        supabase.from('properties').select('id, name').eq('tenant_id', tenantId).order('name'),
-        supabase.from('service_templates').select('id, name').eq('tenant_id', tenantId).order('name')
-    ])
-    
-    properties.value = propsData.data || []
-    serviceTemplates.value = servData.data || []
+    const result = await fetchFormOptions()
+    if (result.success) {
+        properties.value = result.properties
+        serviceTemplates.value = result.templates
+    }
 }
 
 watch(() => props.isOpen, (open) => {
@@ -70,36 +66,21 @@ const handleSave = async () => {
     saving.value = true
 
     try {
-        const tenantId = effectiveTenantId.value
-        if (!tenantId) throw new Error('Tenant ID not found')
-
-        // Dynamic Title
+        // Dynamic Title from template name
         let title = "New Service Opportunity"
         const tpl = serviceTemplates.value.find(t => t.id === form.service_template_id)
         if (tpl) title = tpl.name
 
-        const payload = {
+        const result = await saveOpportunity({
+            id: props.opportunity?.id,
             property_id: form.property_id,
-            service_template_id: form.service_template_id || null, // Allow null?
+            service_template_id: form.service_template_id || null,
             trigger_source: form.trigger_source,
             due_date: form.due_date || null,
-        }
+            title
+        })
 
-        let error
-        if (props.opportunity) {
-             const { error: e } = await supabase.from('service_opportunities').update(payload).eq('id', props.opportunity.id)
-             error = e
-        } else {
-             const { error: e } = await supabase.from('service_opportunities').insert({
-                 ...payload,
-                 tenant_id: tenantId,
-                 status: 'Pending',
-                 title: title
-             })
-             error = e
-        }
-
-        if (error) throw error
+        if (!result.success) throw new Error(result.error)
 
         emit('saved')
         emit('close')
@@ -113,8 +94,8 @@ const handleSave = async () => {
 
 const handleDelete = async () => {
     if (!confirm("Delete this opportunity?")) return
-    const { error } = await supabase.from('service_opportunities').update({ deleted_at: new Date().toISOString() }).eq('id', props.opportunity.id)
-    if (error) alert(error.message)
+    const result = await deleteOpportunity(props.opportunity.id)
+    if (!result.success) alert(result.error)
     else { emit('saved'); emit('close'); }
 }
 </script>
