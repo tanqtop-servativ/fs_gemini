@@ -1,11 +1,14 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { Plus, Eye, ArrowRight } from 'lucide-vue-next'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import ServiceOpportunityDetailModal from '../components/services/ServiceOpportunityDetailModal.vue'
 import { useAuth } from '../composables/useAuth'
 
+const router = useRouter()
+const route = useRoute()
 const items = ref([])
 const loading = ref(true)
 
@@ -60,12 +63,28 @@ const fetchData = async () => {
         }
     }
 
+    checkRouteParam()
     loading.value = false
+}
+
+// Check if we need to open a specific item from URL
+const checkRouteParam = () => {
+    const id = route.query.id
+    if (id && items.value.length > 0) {
+        const item = items.value.find(i => i.id === id)
+        if (item) {
+            openDetail(item)
+        }
+    }
 }
 
 watch(userProfile, (newVal) => {
     if (newVal?.tenant_id) fetchData()
 }, { immediate: true })
+
+watch(() => route.query.id, () => {
+    checkRouteParam()
+})
 
 // Actions
 const openNew = () => {

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { Plus, Eye, Mail, Shield, UserCircle } from 'lucide-vue-next'
 import PersonDetailModal from '../components/people/PersonDetailModal.vue'
@@ -7,6 +8,8 @@ import PersonFormModal from '../components/people/PersonFormModal.vue'
 import RolesManagerModal from '../components/people/RolesManagerModal.vue'
 
 // State
+const router = useRouter()
+const route = useRoute()
 const people = ref([])
 const loading = ref(true)
 const showArchived = ref(false)
@@ -40,10 +43,25 @@ const fetchData = async () => {
 
     const { data } = await query
     people.value = data || []
+    checkRouteParam()
     loading.value = false
 }
 
+// Check if we need to open a specific person from URL
+const checkRouteParam = () => {
+    const id = route.query.id
+    if (id && people.value.length > 0) {
+        const p = people.value.find(x => x.id === id)
+        if (p) {
+            openDetail(p)
+        }
+    }
+}
+
 watch(showArchived, fetchData)
+watch(() => route.query.id, () => {
+    checkRouteParam()
+})
 watch(userProfile, (newVal) => {
     if (newVal?.tenant_id) fetchData()
 }, { immediate: true })

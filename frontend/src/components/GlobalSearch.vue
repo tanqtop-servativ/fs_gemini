@@ -59,11 +59,8 @@ const handleSelect = (item) => {
     
     if (item.link) {
         router.push(item.link)
-    } else if (item.type === 'job') {
-        router.push(`/jobs/${item.id}`)
     } else {
-        // Fallback for types without direct links (like service opps for now)
-        // Just log or maybe implement specific query param handling later
+        // Should not happen for search results, but safe fallback
         console.log('Selected item without link:', item)
     }
 }

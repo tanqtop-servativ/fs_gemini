@@ -63,6 +63,9 @@ const checkRouteParam = () => {
 
 // Watchers
 watch(showArchived, fetchProperties)
+watch(() => route.query.id, () => {
+    checkRouteParam()
+})
 watch(userProfile, (newVal) => {
     if (newVal?.tenant_id) fetchProperties()
 }, { immediate: true })
