@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, reactive, computed } from 'vue'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../composables/useAuth'
+import { useBOMTemplates } from '../../composables/useBOMTemplates'
 import { X, Save, Plus, GripVertical, Trash2, Package } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 
@@ -12,9 +12,11 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saved'])
 
+// Composables
+const { saveTemplate } = useBOMTemplates()
+
 const loading = ref(false)
 const saving = ref(false)
-const { effectiveTenantId } = useAuth()
 
 // Form
 const form = reactive({
@@ -94,25 +96,14 @@ const handleSave = async () => {
     saving.value = true
 
     try {
-        const tenantId = effectiveTenantId.value
-        if (!tenantId) throw new Error('Tenant ID not found')
+        const result = await saveTemplate({
+            id: props.template?.id,
+            name: form.name,
+            description: form.description,
+            items: form.items
+        })
 
-        const payload = {
-            p_name: form.name,
-            p_description: form.description,
-            p_items: form.items
-        }
-
-        let error
-        if (props.template) {
-             const { error: e } = await supabase.rpc('update_bom_template', { ...payload, p_id: props.template.id })
-             error = e
-        } else {
-             const { error: e } = await supabase.rpc('create_bom_template', { ...payload, p_tenant_id: tenantId })
-             error = e
-        }
-
-        if (error) throw error
+        if (!result.success) throw new Error(result.error)
 
         emit('saved')
         emit('close')
