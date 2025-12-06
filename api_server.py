@@ -115,8 +115,8 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 
                 if invite:
-                    # Invite User (Sends Email) - Use admin endpoint
-                    url = f"{SUPABASE_URL}/auth/v1/admin/invite"
+                    # Invite User (Sends Magic Link Email)
+                    url = f"{SUPABASE_URL}/auth/v1/invite"
                     payload = {"email": email}
                 else:
                     # Create User (Manual Password)
@@ -134,7 +134,12 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_header('Content-type', 'application/json')
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
-                    self.wfile.write(response.content)
+                    # Ensure we always return valid JSON
+                    try:
+                        error_json = response.json()
+                        self.wfile.write(json.dumps({"success": False, "error": error_json.get("message", str(error_json))}).encode())
+                    except:
+                        self.wfile.write(json.dumps({"success": False, "error": f"Supabase error: {response.status_code}"}).encode())
                     return
 
                 user_data = response.json()
