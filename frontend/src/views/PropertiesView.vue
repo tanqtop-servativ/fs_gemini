@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { Home, Calendar as CalendarIcon, Plus, Eye } from 'lucide-vue-next'
 import PropertyDetailModal from '../components/properties/PropertyDetailModal.vue'
@@ -8,6 +8,7 @@ import PropertyFormModal from '../components/properties/PropertyFormModal.vue'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
+const route = useRoute()
 const properties = ref([])
 const loading = ref(true)
 const showArchived = ref(false)
@@ -44,8 +45,20 @@ const fetchProperties = async () => {
     console.error('Error fetching properties:', error)
   } else {
     properties.value = data
+    checkRouteParam()
   }
   loading.value = false
+}
+
+// Check if we need to open a specific property from URL
+const checkRouteParam = () => {
+    const id = route.query.id
+    if (id && properties.value.length > 0) {
+        const prop = properties.value.find(p => p.id === id)
+        if (prop) {
+            openDetail(prop)
+        }
+    }
 }
 
 // Watchers
