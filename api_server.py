@@ -115,8 +115,8 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 
                 if invite:
-                    # Invite User (Sends Email)
-                    url = f"{SUPABASE_URL}/auth/v1/invite"
+                    # Invite User (Sends Email) - Use admin endpoint
+                    url = f"{SUPABASE_URL}/auth/v1/admin/invite"
                     payload = {"email": email}
                 else:
                     # Create User (Manual Password)
