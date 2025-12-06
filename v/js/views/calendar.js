@@ -178,15 +178,14 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'multiMonth1',
-        showNonCurrentDates: true,
         fixedWeekCount: false,
         views: {
-            multiMonth1: { type: 'dayGridMonth', duration: { months: 1 } },
-            multiMonth2: { type: 'multiMonthYear', duration: { months: 2 }, multiMonthMaxColumns: 1 },
-            multiMonth3: { type: 'multiMonthYear', duration: { months: 3 }, multiMonthMaxColumns: 1 },
-            multiMonth4: { type: 'multiMonthYear', duration: { months: 4 }, multiMonthMaxColumns: 1 },
-            multiMonth5: { type: 'multiMonthYear', duration: { months: 5 }, multiMonthMaxColumns: 1 },
-            multiMonth6: { type: 'multiMonthYear', duration: { months: 6 }, multiMonthMaxColumns: 1 },
+            multiMonth1: { type: 'dayGridMonth', duration: { months: 1 }, showNonCurrentDates: true },
+            multiMonth2: { type: 'multiMonthYear', duration: { months: 2 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
+            multiMonth3: { type: 'multiMonthYear', duration: { months: 3 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
+            multiMonth4: { type: 'multiMonthYear', duration: { months: 4 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
+            multiMonth5: { type: 'multiMonthYear', duration: { months: 5 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
+            multiMonth6: { type: 'multiMonthYear', duration: { months: 6 }, multiMonthMaxColumns: 1, showNonCurrentDates: false },
         },
         headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
         height: '100%',
