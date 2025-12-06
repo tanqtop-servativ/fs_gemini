@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, reactive, computed } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../composables/useAuth'
 import { X, Save, Plus, GripVertical, Trash2, Package } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 
@@ -13,6 +14,7 @@ const emit = defineEmits(['close', 'saved'])
 
 const loading = ref(false)
 const saving = ref(false)
+const { effectiveTenantId } = useAuth()
 
 // Form
 const form = reactive({
@@ -92,8 +94,8 @@ const handleSave = async () => {
     saving.value = true
 
     try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const tenantId = session?.user?.user_metadata?.tenant_id
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) throw new Error('Tenant ID not found')
 
         const payload = {
             p_name: form.name,

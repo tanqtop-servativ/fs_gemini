@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, reactive, onMounted } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../composables/useAuth'
 import { X, Save, Calendar, Building, FileText, Smartphone } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -16,6 +17,7 @@ const saving = ref(false)
 // Data
 const properties = ref([])
 const serviceTemplates = ref([])
+const { effectiveTenantId } = useAuth()
 
 // Form
 const form = reactive({
@@ -30,8 +32,8 @@ const today = new Date().toISOString().split('T')[0]
 
 // Fetch Data
 const fetchOptions = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const tenantId = session?.user?.user_metadata?.tenant_id
+    const tenantId = effectiveTenantId.value
+    if (!tenantId) return
 
     const [propsData, servData] = await Promise.all([
         supabase.from('properties').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -68,8 +70,8 @@ const handleSave = async () => {
     saving.value = true
 
     try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const tenantId = session?.user?.user_metadata?.tenant_id
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) throw new Error('Tenant ID not found')
 
         // Dynamic Title
         let title = "New Service Opportunity"

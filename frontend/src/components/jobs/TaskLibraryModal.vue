@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../composables/useAuth'
 import { X, Search, Plus, Book, Check } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -22,6 +23,7 @@ const newDescEs = ref('')
 const newReq = ref(false)
 const newPhoto = ref(false)
 const creating = ref(false)
+const { effectiveTenantId } = useAuth()
 
 watch(() => props.isOpen, (open) => {
   if (open) {
@@ -57,8 +59,8 @@ const saveNewTask = async () => {
     if (!newTitle.value) return alert("Title required")
     creating.value = true
 
-    const { data: { session } } = await supabase.auth.getSession()
-    const tenantId = session?.user?.user_metadata?.tenant_id
+    const tenantId = effectiveTenantId.value
+    if (!tenantId) return alert('Tenant ID not found')
 
     const payload = {
         tenant_id: tenantId,

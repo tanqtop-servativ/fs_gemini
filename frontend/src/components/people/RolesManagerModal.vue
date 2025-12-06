@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../composables/useAuth'
 import { X, Plus, Pencil, Trash2, RotateCcw } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -18,6 +19,7 @@ const editingRole = ref(null) // null = none, {} = new, {id} = edit
 const formName = ref('')
 const formDesc = ref('')
 const saving = ref(false)
+const { effectiveTenantId } = useAuth()
 
 watch(() => [props.isOpen, showArchived.value], async ([open]) => {
   if (open) {
@@ -46,9 +48,7 @@ const saveRole = async () => {
     if (!formName.value) return
     saving.value = true
     
-    // Get tenant (or assume RLS handles it, but creating usually needs it if not defaulted)
-    const { data: { session } } = await supabase.auth.getSession()
-    const tenantId = session?.user?.user_metadata?.tenant_id
+    const tenantId = effectiveTenantId.value
 
     const payload = {
         name: formName.value,
