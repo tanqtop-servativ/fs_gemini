@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, reactive } from 'vue'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../composables/useAuth'
+import { usePeople } from '../../composables/usePeople'
 import { X, Save, Check, UserPlus, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -10,6 +10,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+
+// Composables
+const { createUserLogin, createPerson, updatePerson, assignRoles, archivePerson } = usePeople()
 
 // State
 const loading = ref(false)
@@ -25,9 +28,6 @@ const form = reactive({
   auth_method: 'invite', // invite, manual
   password: ''
 })
-
-// Environment
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 // Reset & Load
 watch(() => props.isOpen, async (open) => {
@@ -77,68 +77,51 @@ const handleSave = async () => {
     try {
         let userId = props.person?.user_id || null
 
-        // 1. Create User Logic
+        // 1. Create User Login (if needed)
         if (form.create_user && !userId) {
-            const res = await fetch(`${API_URL}/create-user`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: form.email,
-                    password: form.password,
-                    invite: form.auth_method === 'invite'
-                })
+            const userResult = await createUserLogin({
+                email: form.email,
+                password: form.password,
+                invite: form.auth_method === 'invite'
             })
-            const result = await res.json()
-            if (!result.success) throw new Error(result.error || "Failed to create user")
-            userId = result.user?.id || result.user?.user?.id
+            if (!userResult.success) throw new Error(userResult.error)
+            userId = userResult.userId
         }
 
         // 2. Save Person
-        const tenantId = useAuth().userProfile.value?.tenant_id
-        
-        if (!tenantId) {
-             throw new Error("Tenant ID missing. Please refresh or check connection.")
-        }
-
         if (props.person) {
-             const { error } = await supabase.rpc('save_person_safe', {
-                 p_id: props.person.id,
-                 p_tenant_id: tenantId,
-                 p_first: form.first_name,
-                 p_last: form.last_name,
-                 p_email: form.email,
-                 p_role_ids: form.role_ids
-             })
-             if (error) throw error
+            // Update existing person
+            const result = await updatePerson({
+                id: props.person.id,
+                first_name: form.first_name,
+                last_name: form.last_name,
+                email: form.email,
+                role_ids: form.role_ids
+            })
+            if (!result.success) throw new Error(result.error)
         } else {
-             // Create Full Person
-             // Logic from people.js: create_full_person then save_person_safe for roles if needed.
-             // Actually, create_full_person takes p_user_id.
-             const { data: res, error } = await supabase.rpc('create_full_person', {
-                 p_first_name: form.first_name,
-                 p_last_name: form.last_name,
-                 p_email: form.email,
-                 p_phone: null,
-                 p_tenant_id: tenantId,
-                 p_role: 'user', // default role (optional param)
-                 p_user_id: userId
-             })
-             
-             if (error) throw error
-             if (res && !res.success) throw new Error(res.error)
+            // Create new person
+            const result = await createPerson({
+                first_name: form.first_name,
+                last_name: form.last_name,
+                email: form.email,
+                userId
+            })
+            if (!result.success) throw new Error(result.error)
 
-             // Assign Roles
-             if (form.role_ids.length > 0 && res.person_id) {
-                 const { error: rErr } = await supabase.rpc('save_person_safe', {
-                     p_id: res.person_id,
-                     p_tenant_id: tenantId,
-                     p_first: form.first_name,
-                     p_last: form.last_name,
-                     p_email: form.email,
-                     p_role_ids: form.role_ids
-                 })
-                 if (rErr) throw rErr
-             }
+            // Assign Roles (if any)
+            if (form.role_ids.length > 0 && result.personId) {
+                const roleResult = await assignRoles({
+                    personId: result.personId,
+                    roleIds: form.role_ids,
+                    personData: {
+                        first_name: form.first_name,
+                        last_name: form.last_name,
+                        email: form.email
+                    }
+                })
+                if (!roleResult.success) throw new Error(roleResult.error)
+            }
         }
 
         emit('saved')
@@ -154,8 +137,8 @@ const handleSave = async () => {
 
 const handleArchive = async () => {
     if (!confirm("Archive this person?")) return
-    const { error } = await supabase.from('people').update({ deleted_at: new Date().toISOString() }).eq('id', props.person.id)
-    if (error) alert(error.message)
+    const result = await archivePerson(props.person.id)
+    if (!result.success) alert(result.error)
     else {
         emit('saved')
         emit('close')
