@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { signOut, userProfile } = useAuth()
+const { signOut, userProfile, user } = useAuth()
 
 const isSuperuser = computed(() => userProfile.value?.is_superuser)
 
@@ -66,7 +66,7 @@ const handleLogout = async () => {
       
       <!-- User Info -->
       <div v-if="userProfile" class="mt-3 px-4 text-xs text-slate-400 space-y-0.5">
-        <div class="font-medium text-slate-600 truncate">{{ userProfile.email }}</div>
+        <div class="font-medium text-slate-600 truncate">{{ user?.email }}</div>
         <div class="truncate">{{ userProfile.tenants?.name || 'No Tenant' }}</div>
       </div>
     </div>
