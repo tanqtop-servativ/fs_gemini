@@ -105,12 +105,14 @@ const { userProfile } = useAuth()
 // Data Fetching
 const fetchProperties = async () => {
     // Rely on RLS, but ensure auth is ready
-    if (!userProfile.value) return
+    if (!userProfile.value?.tenant_id) return
     const { data } = await supabase
         .from('properties')
         .select('id, name')
+        .eq('tenant_id', userProfile.value.tenant_id)
         .eq('status', 'active')
         .is('deleted_at', null)
+        .order('name')
         
     if (data) properties.value = data
 }
