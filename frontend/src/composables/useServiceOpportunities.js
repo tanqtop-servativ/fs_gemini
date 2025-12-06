@@ -100,8 +100,17 @@ export function useServiceOpportunities() {
         }
 
         const [propsResult, templatesResult] = await Promise.all([
-            supabase.from('properties').select('id, name').eq('tenant_id', tenantId).order('name'),
-            supabase.from('service_templates').select('id, name').eq('tenant_id', tenantId).order('name')
+            supabase.from('properties')
+                .select('id, name')
+                .eq('tenant_id', tenantId)
+                .eq('status', 'active')
+                .is('deleted_at', null)
+                .order('name'),
+            supabase.from('service_templates')
+                .select('id, name')
+                .eq('tenant_id', tenantId)
+                .is('deleted_at', null)
+                .order('name')
         ])
 
         if (propsResult.error) {

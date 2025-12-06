@@ -108,6 +108,7 @@ export function useProperties() {
             .from('properties')
             .select('*')
             .eq('tenant_id', tenantId)
+            .eq('status', 'active')
             .is('deleted_at', null)
             .order('name')
 
