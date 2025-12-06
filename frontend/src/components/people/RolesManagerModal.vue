@@ -62,7 +62,7 @@ const fetchAuditHistory = async () => {
 }
 
 watch(activeTab, (newTab) => {
-    if (newTab === 'history' && auditHistory.value.length === 0) {
+    if (newTab === 'history') {
         fetchAuditHistory()
     }
 })
