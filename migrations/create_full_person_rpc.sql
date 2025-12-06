@@ -3,8 +3,8 @@ CREATE OR REPLACE FUNCTION public.create_full_person(
     p_last_name text,
     p_email text,
     p_phone text,
-    p_role text DEFAULT 'user',
     p_tenant_id uuid,
+    p_role text DEFAULT 'user',
     p_user_id uuid DEFAULT NULL
 )
 RETURNS jsonb
