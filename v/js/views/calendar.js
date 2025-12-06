@@ -205,9 +205,9 @@ async function initCalendarLogic(calendarElId, propSelectorId, viewSelectorId, m
 
             return {
                 html: `
-                <div class="p-1 overflow-hidden h-full flex flex-col justify-center leading-tight">
-                    <div class="font-bold text-xs truncate">${arg.event.title}</div>
-                    ${props.property_name ? `<div class="text-[10px] truncate opacity-90">${props.property_name}</div>` : ''}
+                <div class="px-1 py-px overflow-hidden h-full flex flex-col justify-center leading-none">
+                    <div class="font-bold text-[10px] truncate mb-px">${arg.event.title}</div>
+                    ${props.property_name ? `<div class="text-[9px] truncate opacity-90">${props.property_name}</div>` : ''}
                 </div>`
             };
         },
