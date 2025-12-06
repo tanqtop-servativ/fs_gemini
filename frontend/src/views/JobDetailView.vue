@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, CheckCircle2, Circle, Calendar, MapPin, Briefcase } from 'lucide-vue-next'
@@ -9,13 +9,14 @@ import JobPhotos from '../components/jobs/JobPhotos.vue'
 
 const route = useRoute()
 const router = useRouter()
-const jobId = route.params.id
+const jobId = computed(() => route.params.id)
 
 const job = ref(null)
 const tasks = ref([])
 const loading = ref(true)
 
 const fetchJob = async () => {
+    if (!jobId.value) return
     loading.value = true
     const { data, error } = await supabase
         .from('jobs')
@@ -24,7 +25,7 @@ const fetchJob = async () => {
             property:property_id(name, address),
             service:service_opportunity_id(service_template_id)
         `)
-        .eq('id', jobId)
+        .eq('id', jobId.value)
         .single()
     
     if (error) {
@@ -43,7 +44,7 @@ const fetchTasks = async () => {
     const { data } = await supabase
         .from('job_tasks')
         .select('*')
-        .eq('job_id', jobId)
+        .eq('job_id', jobId.value)
         .order('id') // or sort_order if exists
     
     tasks.value = data || []
@@ -75,7 +76,7 @@ const updateStatus = async (newStatus) => {
     const { error } = await supabase
         .from('jobs')
         .update({ status: newStatus })
-        .eq('id', jobId)
+        .eq('id', jobId.value)
     
     if (error) alert(error.message)
     else job.value.status = newStatus

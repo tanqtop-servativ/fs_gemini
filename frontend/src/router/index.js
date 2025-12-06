@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuth } from '../composables/useAuth'
+import { supabase } from '../lib/supabase'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 
@@ -84,23 +84,9 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-    const { user, loading, initAuth } = useAuth()
-
-    // Wait for initial load if needed (simple check)
-    if (loading.value) {
-        // In a real app we might wait for the promise, but useAuth init is async inside mount.
-        // For simplicity, we assume Supabase client has local storage state immediately available 
-        // or we might need a dedicated auth loader.
-        // checking supabase.auth.getSession() is usually fast.
-    }
-
-    // Direct check to Supabase for the guard to be safe
-    // (Or rely on the user ref if we trust it's sync enough, but usually better to check storage)
-    // Let's rely on the composable's user ref which we expect App.vue to have started.
-    // Actually, router guard happens BEFORE App mount sometimes? 
-    // Safety:
-    const session = await import('../lib/supabase').then(m => m.supabase.auth.getSession())
-    const isAuthenticated = !!session.data.session
+    // Direct check to Supabase - this is synchronous from localStorage cache
+    const { data: { session } } = await supabase.auth.getSession()
+    const isAuthenticated = !!session
 
     if (to.meta.requiresAuth && !isAuthenticated) {
         next('/login')

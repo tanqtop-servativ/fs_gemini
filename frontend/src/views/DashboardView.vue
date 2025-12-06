@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'vue-router'
 import { Clock, Calendar, CheckCircle2, AlertTriangle, Briefcase } from 'lucide-vue-next'
+import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
 const loading = ref(true)
@@ -27,8 +28,6 @@ const columnConfig = [
     { id: 'next_week', label: 'Next Week', class: 'bg-gray-50 border-gray-100 text-gray-700' },
     { id: 'future', label: 'Future', class: 'bg-gray-50 border-gray-100 text-gray-700' }
 ]
-
-import { useAuth } from '../composables/useAuth'
 
 const { userProfile } = useAuth()
 

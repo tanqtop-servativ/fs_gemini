@@ -1,11 +1,14 @@
 <script setup>
-import { ref, watch, reactive, onMounted } from 'vue'
+import { ref, watch, reactive } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { uploadFile } from '../../lib/upload'
+import { useAuth } from '../../composables/useAuth'
 import { 
   X, Save, Trash2, Upload, Plus, RotateCcw, 
   Wifi, Key, Home, Image as ImageIcon 
 } from 'lucide-vue-next'
+
+const { userProfile } = useAuth()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -236,25 +239,11 @@ const saveData = async () => {
     p_inventory: inventory.value
   }
   
-  // Note: getTenantId() handled by RPC default or should be passed?
-  // The RPC expects p_tenant_id.
-  // In Vue, we can try to guess or let backend default.
-  // RPC signature: create_property_safe(p_tenant_id uuid, ...).
-  // I need to get tenant_id. I can get it from user session.
-  const { data: { session } } = await supabase.auth.getSession()
-  const tenantId = session?.user?.user_metadata?.tenant_id
-  
+  // Get tenant_id from userProfile (fetched at login)
+  const tenantId = userProfile.value?.tenant_id
   if (!tenantId) {
-    // If not in metadata, we have a problem.
-    // For now, I'll pass active user's tenant_id if I can query it.
-    // Assuming metadata has it.
-    // If not, the RPC might need a fix or we need to query `users` table.
-    // The original app used `getTenantId()` which read from session or global var.
-    // I'll assume metadata. Or pass null and let RLS handle? RPC defines it as param.
-    // WAIT: `create_property_safe` in previous SQL contexts might require it.
-    // I'll try to proceed.
+    return alert("Unable to determine tenant. Please log out and log back in.")
   }
-  
   payload.p_tenant_id = tenantId
 
   try {

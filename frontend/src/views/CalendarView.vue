@@ -11,6 +11,7 @@ import tippy from 'tippy.js'
 import 'tippy.js/dist/tippy.css'
 import 'tippy.js/themes/light-border.css'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../composables/useAuth'
 
 // Refs for UI state
 const route = useRoute()
@@ -99,8 +100,6 @@ const calendarOptions = {
   }
 }
 
-import { useAuth } from '../composables/useAuth'
-
 const { userProfile } = useAuth()
 
 // Data Fetching
@@ -150,10 +149,6 @@ const fetchEvents = async () => {
 watch(() => route.query.propertyId, (newId) => {
     selectedPropId.value = newId || 'all'
 }, { immediate: true })
-
-watch(selectedPropId, (newVal) => {
-    fetchEvents()
-})
 
 watch(userProfile, (newVal) => {
     if (newVal) {

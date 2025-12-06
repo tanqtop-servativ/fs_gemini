@@ -12,7 +12,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saved'])
 
-const loading = ref(false)
 const saving = ref(false)
 const showLibrary = ref(false)
 

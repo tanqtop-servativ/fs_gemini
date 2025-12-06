@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { Home, Calendar as CalendarIcon, Plus, Eye } from 'lucide-vue-next'
 import PropertyDetailModal from '../components/properties/PropertyDetailModal.vue'
 import PropertyFormModal from '../components/properties/PropertyFormModal.vue'
+import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
 const properties = ref([])
@@ -17,8 +18,6 @@ const showFormModal = ref(false)
 const selectedProperty = ref(null)
 
 // Data Fetching
-import { useAuth } from '../composables/useAuth'
-
 const { userProfile } = useAuth()
 
 const fetchProperties = async () => {

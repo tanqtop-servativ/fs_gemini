@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { Plus, Eye, ArrowRight } from 'lucide-vue-next'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import ServiceOpportunityDetailModal from '../components/services/ServiceOpportunityDetailModal.vue'
+import { useAuth } from '../composables/useAuth'
 
 const items = ref([])
 const loading = ref(true)
@@ -15,8 +16,6 @@ const selectedItem = ref(null)
 
 // Jobs Cache for Workflow viz
 const jobsMap = ref({})
-
-import { useAuth } from '../composables/useAuth'
 
 const { userProfile } = useAuth()
 
