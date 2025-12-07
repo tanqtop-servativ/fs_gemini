@@ -18,7 +18,7 @@ const fetchComments = async () => {
     loading.value = true
     const { data } = await supabase
         .from('job_comments')
-        .select('*, user:user_id(email)')
+        .select('*')  // Simplified - no profile join for now
         .eq('job_id', props.jobId)
         .order('created_at', { ascending: true })
     
@@ -69,7 +69,7 @@ onMounted(fetchComments)
           <div v-for="c in comments" :key="c.id" class="flex flex-col" :class="{'items-end': c.user_id === user?.id, 'items-start': c.user_id !== user?.id}">
               <div class="max-w-[85%] bg-white border border-gray-100 p-3 rounded-lg shadow-sm" :class="{'bg-blue-50 border-blue-100': c.user_id === user?.id}">
                   <div class="text-[10px] text-gray-400 mb-1 flex justify-between gap-4">
-                      <span class="font-bold text-slate-600">{{ c.user?.email || 'Unknown' }}</span>
+                      <span class="font-bold text-slate-600">{{ c.user_id?.slice(0,8) || 'User' }}</span>
                       <span>{{ new Date(c.created_at).toLocaleString() }}</span>
                   </div>
                   <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ c.content }}</p>

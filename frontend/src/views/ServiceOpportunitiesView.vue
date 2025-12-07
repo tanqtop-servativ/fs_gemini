@@ -2,15 +2,23 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import { Plus, Eye, ArrowRight } from 'lucide-vue-next'
+import { Plus, Eye, ArrowRight, ChevronDown, Check } from 'lucide-vue-next'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import ServiceOpportunityDetailModal from '../components/services/ServiceOpportunityDetailModal.vue'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
 const route = useRoute()
+
 const items = ref([])
 const loading = ref(true)
+// Initialize from localStorage or default
+const savedFilter = localStorage.getItem('service_opps_filter')
+const statusFilter = ref(savedFilter ? JSON.parse(savedFilter) : ['Open', 'In Progress'])
+const isFilterOpen = ref(false)
+const uniqueId = Math.random().toString(36).substr(2, 9)
+
+const allStatuses = ['Open', 'In Progress', 'Snoozed', 'Captured', 'Dismissed']
 
 // Modals
 const showForm = ref(false)
@@ -28,8 +36,11 @@ const fetchData = async () => {
 
     loading.value = true
     
-    // Fetch Opps
-    const { data: opps } = await supabase
+    // Auto-expire snoozes
+    await supabase.rpc('update_expired_snoozes')
+
+    // Base Query
+    let query = supabase
         .from('service_opportunities')
         .select(`
             *,
@@ -38,7 +49,17 @@ const fetchData = async () => {
         `)
         .eq('tenant_id', tenantId)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false })
+    
+    // Status Filtering
+    if (statusFilter.value.length > 0) {
+        query = query.in('status', statusFilter.value)
+    } else {
+        // If nothing selected, show nothing (or could show all, but explicit is better)
+        query = query.in('status', []) 
+    }
+    // 'All' applies no extra status filter (shows everything)
+    
+    const { data: opps } = await query.order('created_at', { ascending: false })
     
     items.value = opps || []
 
@@ -86,6 +107,29 @@ watch(() => route.query.id, () => {
     checkRouteParam()
 })
 
+watch(statusFilter, (newVal) => {
+    localStorage.setItem('service_opps_filter', JSON.stringify(newVal))
+    fetchData()
+}, { deep: true })
+
+const toggleStatus = (status) => {
+    if (statusFilter.value.includes(status)) {
+        statusFilter.value = statusFilter.value.filter(s => s !== status)
+    } else {
+        statusFilter.value = [...statusFilter.value, status]
+    }
+}
+
+// Close filter when clicking outside
+onMounted(() => {
+    document.addEventListener('click', (e) => {
+        const target = e.target
+        if (!target.closest(`#filter-dropdown-${uniqueId}`)) {
+            isFilterOpen.value = false
+        }
+    })
+})
+
 // Actions
 const openNew = () => {
     selectedItem.value = null
@@ -108,8 +152,10 @@ const handleSaved = () => {
 }
 
 const getWorkflowColor = (status) => {
-    if (status === 'Complete') return 'bg-green-100 text-green-700'
+    if (status === 'Complete' || status === 'Captured') return 'bg-green-100 text-green-700'
     if (status === 'In Progress') return 'bg-blue-100 text-blue-700'
+    if (status === 'Snoozed') return 'bg-amber-100 text-amber-800'
+    if (status === 'Dismissed') return 'bg-red-50 text-red-600'
     return 'bg-gray-100 text-gray-600'
 }
 </script>
@@ -121,15 +167,46 @@ const getWorkflowColor = (status) => {
       <div>
         <h1 class="text-2xl font-bold text-slate-900">Service Opportunities</h1>
         <p class="text-gray-500 text-sm">Manage service requests & workflows</p>
-      </div>
+    </div>
       
-      <button 
-        @click="openNew"
-        class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-slate-800 transition shadow-sm"
-      >
-        <Plus class="w-4 h-4 mr-2" />
-        New Opportunity
-      </button>
+      <div class="flex items-center gap-4">
+        <div class="relative" :id="'filter-dropdown-' + uniqueId">
+            <button 
+                @click="isFilterOpen = !isFilterOpen"
+                class="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm hover:border-slate-400 transition"
+            >
+                <span class="text-gray-600">Status:</span>
+                <span class="font-bold text-slate-800">
+                    {{ statusFilter.length === allStatuses.length ? 'All' : statusFilter.length + ' selected' }}
+                </span>
+                <ChevronDown size="14" class="text-gray-400" />
+            </button>
+
+            <!-- Dropdown Panel -->
+            <div v-if="isFilterOpen" class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 p-2 animate-in fade-in slide-in-from-top-2 duration-100">
+                <div class="space-y-1">
+                    <label v-for="status in allStatuses" :key="status" class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer select-none">
+                        <div 
+                            class="w-4 h-4 rounded border flex items-center justify-center transition-colors"
+                            :class="statusFilter.includes(status) ? 'bg-slate-900 border-slate-900' : 'border-gray-300 bg-white'"
+                        >
+                            <Check v-if="statusFilter.includes(status)" size="10" class="text-white" stroke-width="3" />
+                        </div>
+                        <input type="checkbox" class="hidden" :checked="statusFilter.includes(status)" @change="toggleStatus(status)">
+                        <span class="text-sm font-medium text-slate-700">{{ status }}</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <button 
+          @click="openNew"
+          class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-slate-800 transition shadow-sm"
+        >
+          <Plus class="w-4 h-4 mr-2" />
+          New Opportunity
+        </button>
+      </div>
     </div>
 
     <!-- Table -->
@@ -166,24 +243,29 @@ const getWorkflowColor = (status) => {
              <!-- Status -->
              <td class="px-6 py-4">
                  <span class="text-[10px] px-2 py-0.5 rounded font-bold uppercase" :class="getWorkflowColor(item.status)">
-                     {{ item.status }}
+                     <template v-if="item.status === 'Snoozed' && item.snooze_until">
+                        SNOOZED UNTIL {{ new Date(item.snooze_until).toLocaleString() }}
+                     </template>
+                     <template v-else>
+                        {{ item.status }}
+                     </template>
                  </span>
              </td>
              <!-- Workflow Visualization -->
              <td class="px-6 py-4">
-                 <div v-if="jobsMap[item.id] && jobsMap[item.id].length > 0" class="flex items-center gap-1 overflow-x-auto max-w-[200px] scrollbar-hide">
+                 <div v-if="jobsMap[item.id] && jobsMap[item.id].length > 0" class="flex flex-wrap items-center gap-1">
                      <div v-for="(job, idx) in jobsMap[item.id].sort((a,b)=>a.id-b.id)" :key="job.id" class="flex items-center">
                          <div class="px-1.5 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap" :class="getWorkflowColor(job.status)">
                              {{ job.title }}
                          </div>
-                         <ArrowRight v-if="idx < jobsMap[item.id].length - 1" class="mx-1 text-gray-300" size="10"/>
+                         <ArrowRight v-if="idx < jobsMap[item.id].length - 1" class="mx-1 text-black" size="14" stroke-width="2.5"/>
                      </div>
                  </div>
                  <span v-else class="text-xs text-gray-400 italic">No jobs</span>
              </td>
              <!-- Actions -->
              <td class="px-6 py-4 text-right" @click.stop>
-                 <button @click="openDetail(item)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
+                 <button @click="openDetail(item)" aria-label="View Details" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
                      <Eye size="16" />
                  </button>
              </td>

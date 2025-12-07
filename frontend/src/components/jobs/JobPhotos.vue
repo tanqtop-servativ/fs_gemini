@@ -15,14 +15,15 @@ const fileInput = ref(null)
 
 const fetchPhotos = async () => {
     loading.value = true
-    const { data } = await supabase
-        .from('attachments')
-        .select('*')
-        .eq('record_id', props.jobId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
+    // TODO: attachments table doesn't exist yet - skipping fetch
+    // const { data } = await supabase
+    //     .from('attachments')
+    //     .select('*')
+    //     .eq('record_id', props.jobId)
+    //     .eq('status', 'active')
+    //     .order('created_at', { ascending: false })
     
-    photos.value = data || []
+    photos.value = []  // Empty for now
     loading.value = false
 }
 

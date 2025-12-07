@@ -23,7 +23,7 @@ const fetchActiveTimer = async () => {
         .eq('job_id', props.jobId)
         .eq('user_id', session.user.id)
         .is('stopped_at', null)
-        .single()
+        .maybeSingle()  // Use maybeSingle to avoid error when no timer exists
     
     activeTimer.value = data
     loading.value = false

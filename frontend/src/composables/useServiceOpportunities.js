@@ -59,7 +59,7 @@ export function useServiceOpportunities() {
                     .insert({
                         ...payload,
                         tenant_id: tenantId,
-                        status: 'Pending',
+                        status: 'Open',
                         title
                     })
                     .select()
