@@ -70,14 +70,15 @@ const tasks = computed(() => {
                  <h3 class="text-xs font-bold uppercase text-gray-500 mb-2 flex items-center gap-1">
                      <Shield size="12" /> Required Roles
                  </h3>
-                 <div class="flex flex-wrap gap-2">
-                     <span 
-                         v-for="role in templateRoles" 
-                         :key="role"
-                         class="text-xs font-medium px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200"
-                     >
-                         {{ role }}
-                     </span>
+                 <div class="flex flex-wrap items-center gap-2">
+                     <template v-for="(role, idx) in templateRoles" :key="role">
+                         <span 
+                             class="text-xs font-medium px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200"
+                         >
+                             {{ role }}
+                         </span>
+                         <span v-if="idx < templateRoles.length - 1" class="text-xs text-gray-400 italic">or</span>
+                     </template>
                  </div>
             </div>
 
