@@ -41,7 +41,7 @@ const contextMenuY = ref(0)
 const contextMenuOptions = ref([])
 
 const { userProfile } = useAuth()
-const { dismissOpportunity } = useServiceOpportunities()
+const { dismissOpportunity, unsnoozeOpportunity } = useServiceOpportunities()
 
 const fetchData = async (isBackground = false) => {
     const tenantId = userProfile.value?.tenant_id
@@ -211,7 +211,16 @@ const handleContextMenu = (e, item) => {
             icon: Eye,
             action: () => openDetail(item)
         },
-        {
+        item.status === 'Snoozed' ? {
+            label: 'Unsnooze',
+            icon: Clock,
+            class: 'text-emerald-600',
+            action: async () => {
+                const { success, error } = await unsnoozeOpportunity(item.id)
+                if (success) fetchData()
+                else alert(error)
+            }
+        } : {
             label: 'Snooze',
             icon: Clock,
             class: 'text-amber-600',

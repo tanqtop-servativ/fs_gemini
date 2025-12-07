@@ -119,6 +119,8 @@ const handleSave = async () => {
     } finally {
         saving.value = false
     }
+}
+
 const handleClose = () => {
     if (initialState.value && getSnapshot() !== initialState.value) {
         if (!confirm("You have unsaved changes. Are you sure you want to close?")) return

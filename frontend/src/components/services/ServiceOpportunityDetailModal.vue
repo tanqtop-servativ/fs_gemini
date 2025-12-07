@@ -253,7 +253,7 @@ const statusColor = (s) => {
                  <div class="flex justify-between items-center mb-3">
                      <h4 class="font-bold text-slate-700 uppercase text-sm">Workflow Status</h4>
                      
-                     <div v-if="jobs.length === 0 && opportunity.status === 'Pending'" class="animate-pulse">
+                     <div v-if="jobs.length === 0 && ['Open', 'Pending'].includes(opportunity.status)" class="animate-pulse">
                          <button @click="generateWorkflow" :disabled="generating" class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-700 flex items-center transition disabled:opacity-50">
                              <Zap size="14" class="mr-1" />
                              {{ generating ? 'Generating...' : 'Generate Workflow' }}
