@@ -94,6 +94,7 @@ watch(() => props.isOpen, async (open) => {
     } else {
       resetForm()
     }
+    initialState.value = getSnapshot() // Capture baseline
     loading.value = false
   }
 })
@@ -243,16 +244,35 @@ const saveData = async () => {
     saving.value = false
   }
 }
+
+// Logic: Check Changes
+const initialState = ref('')
+
+const getSnapshot = () => {
+    return JSON.stringify({
+        form: form,
+        feeds: feeds.value,
+        inventory: inventory.value
+    })
+}
+
+const handleClose = () => {
+    const current = getSnapshot()
+    if (initialState.value && current !== initialState.value) {
+        if (!confirm("You have unsaved changes. Are you sure you want to close?")) return
+    }
+    emit('close')
+}
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
       
       <!-- Header -->
       <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
         <h2 class="text-lg font-bold text-slate-900">{{ property ? 'Edit Property' : 'New Property' }}</h2>
-        <button @click="$emit('close')" class="text-gray-400 hover:text-black transition"><X size="20" /></button>
+        <button @click="handleClose" class="text-gray-400 hover:text-black transition"><X size="20" /></button>
       </div>
       
       <!-- Body -->
@@ -398,7 +418,7 @@ const saveData = async () => {
                 <div class="bg-white p-4 rounded-lg shadow-sm">
                      <h3 class="text-xs font-bold uppercase text-gray-500 mb-3">Integrations</h3>
                      <div class="grid grid-cols-2 gap-2">
-                         <div><label class="text-[10px] text-gray-400 block">HCP Guest ID</label><input v-model="form.hcp_cust" class="w-full border p-1 rounded text-sm"></div>
+                         <div><label class="text-[10px] text-gray-400 block">HCP Customer ID</label><input v-model="form.hcp_cust" class="w-full border p-1 rounded text-sm"></div>
                          <div><label class="text-[10px] text-gray-400 block">HCP Addr ID</label><input v-model="form.hcp_addr" class="w-full border p-1 rounded text-sm"></div>
                      </div>
                 </div>
@@ -414,8 +434,9 @@ const saveData = async () => {
         </button>
         <div v-else></div> <!-- Spacer -->
         
+        
         <div class="flex gap-4">
-             <button @click="$emit('close')" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded text-sm font-bold">Cancel</button>
+             <button @click="handleClose" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded text-sm font-bold">Cancel</button>
              <button @click="saveData" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center">
                  <Save size="16" class="mr-2" />
                  {{ saving ? 'Saving...' : 'Save Property' }}

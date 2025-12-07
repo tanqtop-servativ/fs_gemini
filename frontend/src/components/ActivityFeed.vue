@@ -51,16 +51,88 @@ onUnmounted(() => {
 const formatTime = (ts) => {
     if (!ts) return ''
     const d = new Date(ts)
-    const now = new Date()
-    if (d.toDateString() === now.toDateString()) {
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-    return d.toLocaleDateString()
+    return d.toLocaleString([], { 
+        year: 'numeric',
+        month: 'short', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    })
 }
 
 const formatFullTimestamp = (ts) => {
     if (!ts) return ''
     return new Date(ts).toLocaleString()
+}
+
+const generateSmartSummary = (item) => {
+    // Communication events are already formatted well by SQL view
+    if (item.category === 'COMMUNICATION') return item.summary
+
+    const d = item.details || {}
+    const table = d.table || 'Record'
+    const op = d.operation || 'UPDATE'
+    const oldVal = d.old || {}
+    const newVal = d.new || {}
+
+    // 1. Readable Table Name
+    const tableMap = {
+        'service_opportunities': 'Service Opportunity',
+        'jobs': 'Job',
+        'people': 'Person',
+        'properties': 'Property',
+        'roles': 'Role',
+        'person_roles': 'Role Assignment',
+        'job_tasks': 'Job Task',
+        'job_assignments': 'Job Assignment',
+        'bom_templates': 'BOM Template',
+        'service_templates': 'Service Template',
+        'job_templates': 'Job Template'
+    }
+    const readableTable = tableMap[table] || table
+
+    // 2. Readable Operation
+    const opMap = {
+        'INSERT': 'Created',
+        'UPDATE': 'Updated',
+        'DELETE': 'Deleted'
+    }
+    const readableOp = opMap[op] || op
+
+    // 3. Identify Name/Title
+    const record = op === 'DELETE' ? oldVal : newVal
+    let name = record?.name || record?.title || record?.email || record?.description
+    if (!name && (record?.first_name || record?.last_name)) {
+        name = `${record.first_name || ''} ${record.last_name || ''}`.trim()
+    }
+    
+    // Fallback for assignments if we have ID but no joined name
+    // (Ideally, the audit log/feed would include enrichments, but we work with raw data here)
+    if (!name) name = '' 
+
+    // 4. Summarize Changes (for Updates)
+    let changeSummary = ''
+    if (op === 'UPDATE') {
+        const changes = []
+        const ignore = ['updated_at', 'created_at', 'deleted_at', 'readable_id', 'id', 'tenant_id']
+        
+        Object.keys(newVal).forEach(key => {
+            if (ignore.includes(key)) return
+            if (JSON.stringify(newVal[key]) !== JSON.stringify(oldVal[key])) {
+                // Formatting key
+                const readableKey = key.replace(/_/g, ' ')
+                changes.push(readableKey)
+            }
+        })
+        
+        if (changes.length > 0) {
+            const max = 2
+            const joined = changes.slice(0, max).join(', ')
+            changeSummary = `(Changed ${joined}${changes.length > max ? '...' : ''})`
+        }
+    }
+
+    return `${readableOp} ${readableTable}: ${name} ${changeSummary}`
 }
 
 const getIcon = (item) => {
@@ -146,7 +218,7 @@ const copyToClipboard = async (item) => {
                   </div>
                   <div class="flex-1 min-w-0">
                       <div class="flex justify-between items-start">
-                          <p class="text-sm font-medium text-slate-800 truncate pr-2">{{ item.summary }}</p>
+                          <p class="text-sm font-medium text-slate-800 truncate pr-2">{{ generateSmartSummary(item) }}</p>
                           <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ formatTime(item.timestamp) }}</span>
                       </div>
                       <div class="text-xs text-slate-500 flex items-center justify-between mt-1">

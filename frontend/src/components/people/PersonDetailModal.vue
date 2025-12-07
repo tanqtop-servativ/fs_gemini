@@ -36,7 +36,12 @@ const initials = computed(() => {
                         <div v-if="person.deleted_at" class="text-xs font-bold text-red-500 uppercase mt-1">Archived</div>
                     </div>
                 </div>
-                <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+                <div class="flex items-center gap-1">
+                    <button v-if="!person.deleted_at" @click="$emit('edit', person)" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100" title="Edit Person">
+                        <Pencil size="16" />
+                    </button>
+                    <button @click="$emit('close')" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100"><X size="20" /></button>
+                </div>
             </div>
 
             <div class="mb-6">

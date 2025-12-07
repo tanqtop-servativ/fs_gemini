@@ -96,7 +96,7 @@ const mapLink = computed(() => `https://maps.google.com/?q=${encodeURIComponent(
               </a>
             </div>
             <button @click="$emit('edit', property)" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-50" title="Edit Property">
-              <Pencil size="20" />
+              <Pencil size="16" />
             </button>
           </div>
 

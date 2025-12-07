@@ -61,6 +61,7 @@ watch(() => props.isOpen, (open) => {
                 form.property_id = props.defaultPropertyId
             }
         }
+        initialState.value = getSnapshot()
     }
 })
 
@@ -108,15 +109,26 @@ const handleDelete = async () => {
     if (!result.success) alert(result.error)
     else { emit('saved'); emit('close'); }
 }
+
+// Unsaved Config
+const initialState = ref('')
+const getSnapshot = () => JSON.stringify(form)
+
+const handleClose = () => {
+    if (initialState.value && getSnapshot() !== initialState.value) {
+        if (!confirm("You have unsaved changes. Are you sure you want to close?")) return
+    }
+    emit('close')
+}
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
         
         <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
             <h3 class="font-bold text-lg text-slate-900">{{ opportunity ? 'Edit Opportunity' : 'New Service Opportunity' }}</h3>
-            <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+            <button @click="handleClose" class="text-gray-400 hover:text-black"><X size="20" /></button>
         </div>
 
         <div class="p-6 space-y-4 bg-slate-50/50">
@@ -177,7 +189,7 @@ const handleDelete = async () => {
                  <button v-if="opportunity" @click="handleDelete" class="text-red-500 text-sm font-bold hover:bg-red-50 px-3 py-2 rounded">Delete</button>
              </div>
              <div class="flex gap-3">
-                <button @click="$emit('close')" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
+                <button @click="handleClose" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
                 <button @click="handleSave" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center transition disabled:opacity-50">
                     <Save size="16" class="mr-2" />
                     {{ saving ? 'Saving...' : (opportunity ? 'Save Changes' : 'Create Opportunity') }}

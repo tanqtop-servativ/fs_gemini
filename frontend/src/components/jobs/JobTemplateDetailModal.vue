@@ -28,7 +28,12 @@ const tasks = computed(() => {
                 </h2>
                 <p v-if="template.name_es" class="text-sm text-blue-600 font-medium mt-1">{{ template.name_es }}</p>
             </div>
-            <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+            <div class="flex items-center gap-1">
+                <button @click="$emit('edit', template)" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100" title="Edit Template">
+                    <Pencil size="16" />
+                </button>
+                <button @click="$emit('close')" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100"><X size="20" /></button>
+            </div>
         </div>
 
         <div class="p-6 overflow-y-auto flex-1 space-y-6">
@@ -83,9 +88,7 @@ const tasks = computed(() => {
         </div>
         
         <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end" v-if="!template.deleted_at">
-             <button @click="$emit('edit', template)" class="bg-slate-900 text-white px-6 py-2 rounded font-bold hover:bg-slate-700 flex items-center text-sm shadow">
-                 <Pencil size="14" class="mr-2" /> Edit Template
-             </button>
+
         </div>
 
     </div>

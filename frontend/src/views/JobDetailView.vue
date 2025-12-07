@@ -147,7 +147,7 @@ onMounted(fetchJob)
               </div>
 
               <!-- Assignments -->
-              <JobAssignments :jobId="jobId" />
+              <JobAssignments :jobId="jobId" :jobTitle="job.title" />
 
               <!-- Tasks -->
               <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">

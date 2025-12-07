@@ -27,6 +27,10 @@ const form = reactive({
     steps: [] // { job_template_id, is_optional, is_billing, delay_hours, sort_order, _tempId }
 })
 
+// Unsaved Config
+const initialState = ref('')
+const getSnapshot = () => JSON.stringify(form)
+
 // Fetch Job Templates for dropdown
 const fetchJobTemplates = async () => {
     const tenantId = effectiveTenantId.value
@@ -58,6 +62,7 @@ watch(() => props.isOpen, (open) => {
         } else {
             resetForm()
         }
+        initialState.value = getSnapshot()
     }
 })
 
@@ -114,17 +119,22 @@ const handleSave = async () => {
     } finally {
         saving.value = false
     }
+const handleClose = () => {
+    if (initialState.value && getSnapshot() !== initialState.value) {
+        if (!confirm("You have unsaved changes. Are you sure you want to close?")) return
+    }
+    emit('close')
 }
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-200">
         
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
             <h3 class="font-bold text-lg text-slate-900">{{ template ? 'Edit Workflow' : 'New Service Workflow' }}</h3>
-            <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+            <button @click="handleClose" class="text-gray-400 hover:text-black"><X size="20" /></button>
         </div>
 
         <!-- Body -->
@@ -213,7 +223,7 @@ const handleSave = async () => {
 
         <!-- Footer -->
         <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-            <button @click="$emit('close')" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
+            <button @click="handleClose" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
             <button @click="handleSave" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center transition disabled:opacity-50">
                 <Save size="16" class="mr-2" />
                 {{ saving ? 'Saving...' : 'Save Workflow' }}

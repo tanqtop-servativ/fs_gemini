@@ -50,6 +50,7 @@ watch(() => props.isOpen, (open) => {
         } else {
             resetForm()
         }
+        initialState.value = getSnapshot()
     }
 })
 
@@ -137,16 +138,26 @@ const handleRestore = async () => {
     if (!result.success) alert(result.error)
     else { emit('saved'); emit('close'); }
 }
+// Unsaved Config
+const initialState = ref('')
+const getSnapshot = () => JSON.stringify(form)
+
+const handleClose = () => {
+    if (initialState.value && getSnapshot() !== initialState.value) {
+        if (!confirm("You have unsaved changes. Are you sure you want to close?")) return
+    }
+    emit('close')
+}
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
         
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
             <h3 class="font-bold text-lg text-slate-900">{{ template ? 'Edit Job Template' : 'New Job Template' }}</h3>
-            <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+            <button @click="handleClose" class="text-gray-400 hover:text-black"><X size="20" /></button>
         </div>
 
         <!-- Main Content -->
@@ -279,7 +290,7 @@ const handleRestore = async () => {
                  </button>
              </div>
              <div class="flex gap-3">
-                 <button @click="$emit('close')" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
+                 <button @click="handleClose" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
                  <button @click="handleSave" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center transition disabled:opacity-50">
                      <Save size="16" class="mr-2" />
                      {{ saving ? 'Saving...' : 'Save Template' }}

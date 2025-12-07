@@ -54,6 +54,7 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
             
             if not filename or not content_type:
                 self.send_response(400)
+                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(b'Missing filename or contentType')
                 return
@@ -61,6 +62,7 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
             s3 = get_r2_client()
             if not s3:
                 self.send_response(500)
+                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(b'R2 Misconfigured')
                 return
@@ -81,6 +83,7 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps({
                     'uploadUrl': upload_url,
@@ -90,6 +93,7 @@ class AdminRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"Error generating R2 URL: {e}")
                 self.send_response(500)
+                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(str(e).encode('utf-8'))
 

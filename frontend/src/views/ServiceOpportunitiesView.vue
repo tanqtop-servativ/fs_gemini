@@ -1,17 +1,21 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import { Plus, Eye, ArrowRight, ChevronDown, Check } from 'lucide-vue-next'
+import { Plus, Eye, ArrowRight, ChevronDown, Check, Clock, Ban, Moon } from 'lucide-vue-next'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import ServiceOpportunityDetailModal from '../components/services/ServiceOpportunityDetailModal.vue'
+import ContextMenu from '../components/ContextMenu.vue'
 import { useAuth } from '../composables/useAuth'
+import { useServiceOpportunities } from '../composables/useServiceOpportunities'
 
 const router = useRouter()
 const route = useRoute()
 
 const items = ref([])
 const loading = ref(true)
+const autoRefresh = ref(null)
+const snoozedCount = ref(0)
 // Initialize from localStorage or default
 const savedFilter = localStorage.getItem('service_opps_filter')
 const statusFilter = ref(savedFilter ? JSON.parse(savedFilter) : ['Open', 'In Progress'])
@@ -22,19 +26,28 @@ const allStatuses = ['Open', 'In Progress', 'Snoozed', 'Captured', 'Dismissed']
 
 // Modals
 const showForm = ref(false)
+
 const showDetail = ref(false)
 const selectedItem = ref(null)
+const detailModalAction = ref(null)
 
 // Jobs Cache for Workflow viz
 const jobsMap = ref({})
 
-const { userProfile } = useAuth()
+// Context Menu
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextMenuOptions = ref([])
 
-const fetchData = async () => {
+const { userProfile } = useAuth()
+const { dismissOpportunity } = useServiceOpportunities()
+
+const fetchData = async (isBackground = false) => {
     const tenantId = userProfile.value?.tenant_id
     if (!tenantId) return 
-
-    loading.value = true
+    
+    if (!isBackground) loading.value = true
     
     // Auto-expire snoozes
     await supabase.rpc('update_expired_snoozes')
@@ -85,7 +98,19 @@ const fetchData = async () => {
     }
 
     checkRouteParam()
-    loading.value = false
+    checkRouteParam()
+
+    // Fetch Snoozed Count separately
+    const { count } = await supabase
+        .from('service_opportunities')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('status', 'Snoozed')
+        .is('deleted_at', null)
+    
+    snoozedCount.value = count || 0
+
+    if (!isBackground) loading.value = false
 }
 
 // Check if we need to open a specific item from URL
@@ -120,6 +145,10 @@ const toggleStatus = (status) => {
     }
 }
 
+const showSnoozedOnly = () => {
+    statusFilter.value = ['Snoozed']
+}
+
 // Close filter when clicking outside
 onMounted(() => {
     document.addEventListener('click', (e) => {
@@ -128,6 +157,13 @@ onMounted(() => {
             isFilterOpen.value = false
         }
     })
+
+    // Setup Polling
+    autoRefresh.value = setInterval(() => fetchData(true), 30000)
+})
+
+onUnmounted(() => {
+    if (autoRefresh.value) clearInterval(autoRefresh.value)
 })
 
 // Actions
@@ -136,8 +172,9 @@ const openNew = () => {
     showForm.value = true
 }
 
-const openDetail = (item) => {
+const openDetail = (item, action = null) => {
     selectedItem.value = item
+    detailModalAction.value = action
     showDetail.value = true
 }
 
@@ -156,7 +193,48 @@ const getWorkflowColor = (status) => {
     if (status === 'In Progress') return 'bg-blue-100 text-blue-700'
     if (status === 'Snoozed') return 'bg-amber-100 text-amber-800'
     if (status === 'Dismissed') return 'bg-red-50 text-red-600'
+    if (status === 'Dismissed') return 'bg-red-50 text-red-600'
     return 'bg-gray-100 text-gray-600'
+}
+
+// Context Menu Handler
+const handleContextMenu = (e, item) => {
+    e.preventDefault()
+    
+    selectedItem.value = item
+    contextMenuX.value = e.clientX
+    contextMenuY.value = e.clientY
+    
+    contextMenuOptions.value = [
+        {
+            label: 'View Details',
+            icon: Eye,
+            action: () => openDetail(item)
+        },
+        {
+            label: 'Snooze',
+            icon: Clock,
+            class: 'text-amber-600',
+            action: () => {
+                openDetail(item, 'snooze')
+            }
+        },
+        {
+            label: 'Dismiss',
+            icon: Ban,
+            class: 'text-red-600',
+            action: async () => {
+                const reason = prompt("Why is this being dismissed?")
+                if (!reason) return
+                
+                const { success, error } = await dismissOpportunity(item.id, reason)
+                if (success) fetchData()
+                else alert(error)
+            }
+        }
+    ]
+    
+    showContextMenu.value = true
 }
 </script>
 
@@ -167,6 +245,13 @@ const getWorkflowColor = (status) => {
       <div>
         <h1 class="text-2xl font-bold text-slate-900">Service Opportunities</h1>
         <p class="text-gray-500 text-sm">Manage service requests & workflows</p>
+        <p 
+            v-if="snoozedCount > 0" 
+            @click="showSnoozedOnly"
+            class="text-xs font-bold text-amber-600 mt-1 cursor-pointer hover:underline flex items-center gap-1"
+        >
+            <Clock size="12" /> Snoozed ({{ snoozedCount }})
+        </p>
     </div>
       
       <div class="flex items-center gap-4">
@@ -217,7 +302,7 @@ const getWorkflowColor = (status) => {
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Property</th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Service</th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Status</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Workflow Flow</th>
+            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Workflows</th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
         </thead>
@@ -229,7 +314,11 @@ const getWorkflowColor = (status) => {
              <td colspan="5" class="px-6 py-8 text-center text-gray-400">No opportunities found.</td>
            </tr>
 
-           <tr v-for="item in items" :key="item.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(item)">
+           <tr v-for="item in items" :key="item.id" 
+                class="group hover:bg-slate-50 transition-colors cursor-pointer select-none" 
+                @click="openDetail(item)"
+                @contextmenu.prevent.stop="handleContextMenu($event, item)"
+            >
              <!-- Property -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900">{{ item.properties?.name || 'Unknown' }}</div>
@@ -264,11 +353,16 @@ const getWorkflowColor = (status) => {
                  <span v-else class="text-xs text-gray-400 italic">No jobs</span>
              </td>
              <!-- Actions -->
-             <td class="px-6 py-4 text-right" @click.stop>
-                 <button @click="openDetail(item)" aria-label="View Details" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
-                     <Eye size="16" />
-                 </button>
-             </td>
+              <td class="px-6 py-4" @click.stop>
+                  <div class="flex items-center justify-end gap-2">
+                    <button @click="openDetail(item, 'snooze')" aria-label="Snooze" class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition" title="Snooze">
+                        <Moon size="16" />
+                    </button>
+                    <button @click="openDetail(item)" aria-label="View Details" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition" title="View Details">
+                        <Eye size="16" />
+                    </button>
+                  </div>
+              </td>
            </tr>
         </tbody>
       </table>
@@ -277,15 +371,24 @@ const getWorkflowColor = (status) => {
     <ServiceOpportunityDetailModal 
         :is-open="showDetail" 
         :opportunity="selectedItem" 
+        :initial-action="detailModalAction"
         @close="showDetail = false" 
         @edit="openEdit" 
         @refresh="handleSaved"
     />
+
     <ServiceOpportunityFormModal 
         :is-open="showForm" 
         :opportunity="selectedItem" 
         @close="showForm = false" 
         @saved="handleSaved" 
+    />
+
+    <ContextMenu 
+        v-model="showContextMenu"
+        :x="contextMenuX"
+        :y="contextMenuY"
+        :options="contextMenuOptions"
     />
 
   </div>

@@ -127,9 +127,71 @@ export function useServiceOpportunities() {
         }
     }
 
+    /**
+     * Snooze a service opportunity
+     * @param {string} id 
+     * @param {string} snoozeUntilDate ISO string
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const snoozeOpportunity = async (id, snoozeUntilDate) => {
+        const { error } = await supabase
+            .from('service_opportunities')
+            .update({
+                status: 'Snoozed',
+                snooze_until: snoozeUntilDate,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
+    /**
+     * Unsnooze a service opportunity (Set to Open)
+     * @param {string} id 
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const unsnoozeOpportunity = async (id) => {
+        const { error } = await supabase
+            .from('service_opportunities')
+            .update({
+                status: 'Open',
+                snooze_until: null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
+    /**
+     * Dismiss a service opportunity
+     * @param {string} id 
+     * @param {string} reason
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const dismissOpportunity = async (id, reason) => {
+        const { error } = await supabase
+            .from('service_opportunities')
+            .update({
+                status: 'Dismissed',
+                dismissal_reason: reason,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
     return {
         saveOpportunity,
         deleteOpportunity,
-        fetchFormOptions
+        fetchFormOptions,
+        snoozeOpportunity,
+        unsnoozeOpportunity,
+        dismissOpportunity
     }
 }

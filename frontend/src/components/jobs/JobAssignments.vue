@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { UserPlus, X, Clock, Navigation, Play, Pause, CheckCircle2, AlertCircle } from 'lucide-vue-next'
 
 const props = defineProps({
-  jobId: String
+  jobId: String,
+  jobTitle: String
 })
 
 const assignments = ref([])
@@ -28,16 +29,29 @@ const fetchAssignments = async () => {
   loading.value = false
 }
 
-// Fetch available people for assignment
 const fetchAvailablePeople = async () => {
   const { data } = await supabase
     .from('people')
-    .select('id, first_name, last_name')
+    .select('id, first_name, last_name, person_roles(roles(name))')
     .is('deleted_at', null)
     .order('first_name')
   
   availablePeople.value = data || []
 }
+
+const filteredPeople = computed(() => {
+    if (!props.jobTitle) return availablePeople.value
+    
+    // Rule: Kitting jobs require Laundry Technician
+    if (props.jobTitle.toLowerCase().includes('kitting')) {
+        return availablePeople.value.filter(p => {
+            const hasRole = p.person_roles?.some(pr => pr.roles?.name === 'Laundry Technician')
+            return hasRole
+        })
+    }
+    
+    return availablePeople.value
+})
 
 const addPerson = async (personId) => {
   const { error } = await supabase.rpc('assign_person_to_job', {
@@ -193,7 +207,7 @@ watch(() => props.jobId, fetchAssignments, { immediate: true })
         </div>
         <div class="p-4 max-h-64 overflow-y-auto">
           <div 
-            v-for="p in availablePeople" 
+            v-for="p in filteredPeople" 
             :key="p.id" 
             class="p-3 hover:bg-blue-50 rounded cursor-pointer flex justify-between items-center"
             @click="addPerson(p.id)"
@@ -201,7 +215,7 @@ watch(() => props.jobId, fetchAssignments, { immediate: true })
             <span>{{ p.first_name }} {{ p.last_name }}</span>
             <UserPlus size="16" class="text-blue-500" />
           </div>
-          <div v-if="availablePeople.length === 0" class="text-gray-400 text-center py-4">
+          <div v-if="filteredPeople.length === 0" class="text-gray-400 text-center py-4">
             No people available
           </div>
         </div>

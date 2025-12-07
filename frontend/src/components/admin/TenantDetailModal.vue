@@ -125,7 +125,7 @@ const deleteAdmin = async (uid) => {
             </div>
             <div class="flex items-center gap-2">
                 <button @click="editMode = !editMode" class="text-gray-500 hover:text-indigo-600 p-2 rounded-full hover:bg-indigo-50">
-                    <Pencil size="20" />
+                    <Pencil size="16" />
                 </button>
                 <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
             </div>

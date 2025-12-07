@@ -35,7 +35,12 @@ const handleDelete = async () => {
              <div>
                 <h2 class="text-xl font-bold text-slate-900">{{ template.name }}</h2>
             </div>
-            <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+            <div class="flex items-center gap-1">
+                <button @click="$emit('edit', template)" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100" title="Edit Template">
+                    <Pencil size="16" />
+                </button>
+                <button @click="$emit('close')" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100"><X size="20" /></button>
+            </div>
         </div>
 
         <div class="p-6 overflow-y-auto flex-1 space-y-6">
@@ -75,9 +80,7 @@ const handleDelete = async () => {
              <button @click="handleDelete" class="text-red-500 text-sm font-bold hover:bg-red-50 px-3 py-2 rounded flex items-center">
                  <Trash2 size="16" class="mr-2" /> Delete
              </button>
-             <button @click="$emit('edit', template)" class="bg-slate-900 text-white px-6 py-2 rounded font-bold hover:bg-slate-700 flex items-center text-sm shadow">
-                 <Pencil size="14" class="mr-2" /> Edit Template
-             </button>
+
         </div>
 
     </div>

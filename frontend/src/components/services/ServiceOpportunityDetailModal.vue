@@ -2,6 +2,7 @@
 <script setup>
 import { ref, watch, onMounted, computed, nextTick } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { useServiceOpportunities } from '../../composables/useServiceOpportunities'
 import AuditHistory from '../AuditHistory.vue'
 import { X, Play, AlertTriangle, CheckCircle2, Circle, ArrowRight, Pencil, CheckSquare, Square, Zap, Ban, Clock, Check } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
@@ -9,8 +10,11 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const props = defineProps({
   isOpen: Boolean,
-  opportunity: Object
+  opportunity: Object,
+  initialAction: { type: String, default: null }
 })
+
+const { snoozeOpportunity, unsnoozeOpportunity, dismissOpportunity } = useServiceOpportunities()
 
 const snoozeInput = ref(null)
 
@@ -44,6 +48,17 @@ const fetchJobs = async () => {
 watch(() => props.isOpen, (open) => {
     if (open && props.opportunity) {
         fetchJobs()
+        
+        // Handle auto-actions
+        if (props.initialAction === 'snooze') {
+            // Slight delay to ensure modal transition doesn't interfere with picker positioning
+            setTimeout(() => {
+                startSnooze()
+            }, 300) 
+        }
+    } else {
+        // Reset state on close
+        isSnoozing.value = false
     }
 })
 
@@ -62,14 +77,17 @@ const generateWorkflow = async () => {
     generating.value = false
 }
 
-const dismissOpportunity = async () => {
-    if (!confirm('Dismiss this opportunity? It will be archived.')) return
-    const { error } = await supabase
-        .from('service_opportunities')
-        .update({ status: 'Dismissed', updated_at: new Date().toISOString() })
-        .eq('id', props.opportunity.id)
+const handleDismiss = async () => {
+    const reason = prompt("Why is this being dismissed?")
+    if (reason === null) return // Cancelled
+    if (!reason.trim()) {
+        alert("A reason is required to dismiss.")
+        return
+    }
     
-    if (error) alert('Error: ' + error.message)
+    const { success, error } = await dismissOpportunity(props.opportunity.id, reason)
+    
+    if (!success) alert('Error: ' + error)
     else {
         emit('refresh')
         emit('close')
@@ -78,16 +96,15 @@ const dismissOpportunity = async () => {
 
 const startSnooze = async () => {
     isSnoozing.value = true
-    // Default to tomorrow 9am if empty? Or just let them pick
-    if (!snoozeUntilDate.value) {
-        const d = new Date()
-        d.setDate(d.getDate() + 1)
-        d.setHours(8, 0, 0, 0)
-        // Adjust for timezone offset so toISOString() returns local wall (clock) time
-        const offset = d.getTimezoneOffset() * 60000
-        const localDate = new Date(d.getTime() - offset)
-        snoozeUntilDate.value = localDate.toISOString().slice(0, 16)
-    }
+    
+    // Always default to tomorrow 8am
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(8, 0, 0, 0)
+    // Adjust for timezone offset so toISOString() returns local wall (clock) time
+    const offset = d.getTimezoneOffset() * 60000
+    const localDate = new Date(d.getTime() - offset)
+    snoozeUntilDate.value = localDate.toISOString().slice(0, 16)
     
     // Wait for animation (200ms) to finish so picker positions correctly
     setTimeout(() => {
@@ -115,16 +132,9 @@ const confirmSnooze = async () => {
         return
     }
     
-    const { error } = await supabase
-        .from('service_opportunities')
-        .update({ 
-            status: 'Snoozed', 
-            snooze_until: new Date(snoozeUntilDate.value).toISOString(),
-            updated_at: new Date().toISOString() 
-        })
-        .eq('id', props.opportunity.id)
+    const { success, error } = await snoozeOpportunity(props.opportunity.id, new Date(snoozeUntilDate.value).toISOString())
     
-    if (error) alert('Error: ' + error.message)
+    if (!success) alert('Error: ' + error)
     else {
         isSnoozing.value = false
         emit('refresh')
@@ -132,17 +142,10 @@ const confirmSnooze = async () => {
     }
 }
 
-const unsnoozeOpportunity = async () => {
-    const { error } = await supabase
-        .from('service_opportunities')
-        .update({ 
-            status: 'Open', 
-            snooze_until: null,
-            updated_at: new Date().toISOString() 
-        })
-        .eq('id', props.opportunity.id)
+const handleUnsnooze = async () => {
+    const { success, error } = await unsnoozeOpportunity(props.opportunity.id)
     
-    if (error) alert('Error: ' + error.message)
+    if (!success) alert('Error: ' + error)
     else {
         emit('refresh')
         emit('close')
@@ -167,25 +170,28 @@ const statusColor = (s) => {
             <div class="flex items-center gap-3">
                 <div>
                     <h3 class="font-bold text-lg text-slate-900">Opportunity Details</h3>
-<span class="text-xs px-2 py-0.5 rounded font-bold uppercase" :class="statusColor(opportunity.status)">
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs px-2 py-0.5 rounded font-bold uppercase" :class="statusColor(opportunity.status)">
                         <template v-if="opportunity.status === 'Snoozed' && opportunity.snooze_until">
                             SNOOZED UNTIL {{ new Date(opportunity.snooze_until).toLocaleString() }}
                         </template>
                         <template v-else>
                             {{ opportunity.status }}
                         </template>
+
                     </span>
+                    </div>
                 </div>
                 
                 <!-- Action Buttons -->
                 <div v-if="opportunity.status === 'Snoozed'" class="ml-4">
-                     <button @click="unsnoozeOpportunity" class="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 transition">
+                     <button @click="handleUnsnooze" class="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 transition">
                         <Clock size="12" class="opacity-50" /> Unsnooze
                     </button>
                 </div>
 
                 <div v-if="opportunity.status === 'Open'" class="flex gap-2 ml-4">
-                    <button v-if="!isSnoozing" @click="dismissOpportunity" class="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200 transition">
+                    <button v-if="!isSnoozing" @click="handleDismiss" class="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200 transition">
                         <Ban size="12" /> Dismiss
                     </button>
                     <button v-if="!isSnoozing" @click="startSnooze" class="flex items-center gap-1 px-3 py-1.5 bg-amber-100 text-amber-700 rounded text-xs font-bold hover:bg-amber-200 transition">
@@ -201,16 +207,23 @@ const statusColor = (s) => {
                             v-model="snoozeUntilDate"
                             class="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-amber-500 focus:border-amber-500"
                         />
-                        <button @click="confirmSnooze" class="p-1 text-green-600 hover:bg-green-50 rounded" title="Confirm Snooze">
+                        <button type="button" @click.stop.prevent="confirmSnooze" class="p-1 text-green-600 hover:bg-green-50 rounded" title="Confirm Snooze">
                             <Check size="16" stroke-width="3" />
                         </button>
-                        <button @click="cancelSnooze" class="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancel">
+                        <button type="button" @click.stop.prevent="cancelSnooze" class="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancel">
                             <X size="16" />
                         </button>
                     </div>
                 </div>
             </div>
-            <button @click="$emit('close')" class="text-gray-400 hover:text-black"><X size="20" /></button>
+            <div class="flex items-center gap-1">
+                <button @click="$emit('edit', opportunity)" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100" title="Edit Opportunity">
+                    <Pencil size="16" />
+                </button>
+                <button @click="$emit('close')" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100">
+                    <X size="20" />
+                </button>
+            </div>
         </div>
 
         <div class="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
@@ -306,14 +319,18 @@ const statusColor = (s) => {
 
             </div>
 
+            <!-- Audit History -->
+            <div class="px-6 pb-6">
+                <AuditHistory tableName="service_opportunities" :recordId="opportunity.id" />
+            </div>
+
         </div>
 
-        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-             <button @click="$emit('edit', opportunity)" class="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center">
-                 <Pencil size="14" class="mr-2" /> Edit Details
-             </button>
+        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end items-center">
+             <!-- Audit History Only -->
         </div>
 
     </div>
   </div>
 </template>
+```
