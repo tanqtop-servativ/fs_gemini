@@ -1,7 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { supabase } from '../../lib/supabase'
 import AuditHistory from '../AuditHistory.vue'
-import { X, Pencil, CheckSquare, PenTool } from 'lucide-vue-next'
+import { X, Pencil, CheckSquare, PenTool, Shield } from 'lucide-vue-next'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -9,6 +10,26 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'edit'])
+
+const templateRoles = ref([])
+
+const fetchTemplateRoles = async () => {
+    if (!props.template?.id) {
+        templateRoles.value = []
+        return
+    }
+    
+    const { data } = await supabase
+        .from('job_template_roles')
+        .select('role_id, roles(name)')
+        .eq('job_template_id', props.template.id)
+    
+    templateRoles.value = (data || []).map(r => r.roles?.name).filter(Boolean)
+}
+
+watch(() => props.isOpen, (open) => {
+    if (open) fetchTemplateRoles()
+})
 
 const tasks = computed(() => {
     if (!props.template || !props.template.job_template_tasks) return []
@@ -42,6 +63,22 @@ const tasks = computed(() => {
                  <h3 class="text-xs font-bold uppercase text-gray-500 mb-2">Description</h3>
                  <p class="text-sm text-gray-700">{{ template.description || 'No description.' }}</p>
                  <p v-if="template.description_es" class="text-sm text-gray-500 mt-2 italic border-l-2 border-blue-200 pl-2">{{ template.description_es }}</p>
+            </div>
+
+            <!-- Required Roles -->
+            <div v-if="templateRoles.length > 0">
+                 <h3 class="text-xs font-bold uppercase text-gray-500 mb-2 flex items-center gap-1">
+                     <Shield size="12" /> Required Roles
+                 </h3>
+                 <div class="flex flex-wrap gap-2">
+                     <span 
+                         v-for="role in templateRoles" 
+                         :key="role"
+                         class="text-xs font-medium px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200"
+                     >
+                         {{ role }}
+                     </span>
+                 </div>
             </div>
 
             <!-- Tasks -->

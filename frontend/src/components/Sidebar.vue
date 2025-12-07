@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { Home, Calendar, Users, ClipboardList, LogOut, GitMerge, Package, Shield, Activity, Zap, X, LayoutDashboard } from 'lucide-vue-next'
+import { Home, Calendar, Users, ClipboardList, LogOut, GitMerge, Package, Shield, Activity, Zap, X, LayoutDashboard, Briefcase } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
@@ -17,6 +17,7 @@ const menuItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { name: 'Calendar', path: '/calendar', icon: Calendar },
   { name: 'Service Opps', path: '/service-opportunities', icon: Zap },
+  { name: 'Jobs', path: '/jobs', icon: Briefcase },
   { name: 'Job Templates', path: '/job-templates', icon: ClipboardList },
   { name: 'Service Templates', path: '/service-templates', icon: GitMerge },
   { name: 'BOM Templates', path: '/bom-templates', icon: Package },

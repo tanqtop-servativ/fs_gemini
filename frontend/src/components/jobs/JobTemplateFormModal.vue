@@ -18,6 +18,8 @@ const { saveTemplate, archiveTemplate, restoreTemplate } = useJobTemplates()
 
 const saving = ref(false)
 const showLibrary = ref(false)
+const allRoles = ref([])
+const selectedRoleIds = ref([])
 
 // Form State
 const form = reactive({
@@ -28,9 +30,29 @@ const form = reactive({
     tasks: []
 })
 
+// Fetch available roles
+const fetchRoles = async () => {
+    const { data } = await supabase
+        .from('roles')
+        .select('id, name')
+        .order('name')
+    allRoles.value = data || []
+}
+
+// Fetch existing template roles
+const fetchTemplateRoles = async (templateId) => {
+    const { data } = await supabase
+        .from('job_template_roles')
+        .select('role_id')
+        .eq('job_template_id', templateId)
+    selectedRoleIds.value = (data || []).map(r => r.role_id)
+}
+
 // Load
-watch(() => props.isOpen, (open) => {
+watch(() => props.isOpen, async (open) => {
     if (open) {
+        await fetchRoles()
+        
         if (props.template) {
             form.name = props.template.name
             form.name_es = props.template.name_es
@@ -47,8 +69,11 @@ watch(() => props.isOpen, (open) => {
                         .map(c => ({...c})), // Copy checklist
                     id: t.id // Keep ID for potential updates
                 }))
+            
+            await fetchTemplateRoles(props.template.id)
         } else {
             resetForm()
+            selectedRoleIds.value = []
         }
         initialState.value = getSnapshot()
     }
@@ -113,6 +138,27 @@ const handleSave = async () => {
         })
 
         if (!result.success) throw new Error(result.error)
+        
+        const templateId = result.templateId || props.template?.id
+        
+        // Save role assignments
+        if (templateId) {
+            // Delete existing
+            await supabase
+                .from('job_template_roles')
+                .delete()
+                .eq('job_template_id', templateId)
+            
+            // Insert new
+            if (selectedRoleIds.value.length > 0) {
+                await supabase
+                    .from('job_template_roles')
+                    .insert(selectedRoleIds.value.map(roleId => ({
+                        job_template_id: templateId,
+                        role_id: roleId
+                    })))
+            }
+        }
         
         emit('saved')
         emit('close')
@@ -184,6 +230,30 @@ const handleClose = () => {
                          <label class="block text-xs font-bold uppercase text-blue-500 mb-1">Description (ES)</label>
                          <textarea v-model="form.description_es" class="w-full border border-blue-100 p-2 rounded text-sm h-20 resize-none" placeholder="¿Para qué es este trabajo?"></textarea>
                      </div>
+                 </div>
+                 
+                 <!-- Required Roles -->
+                 <div class="border-t border-gray-100 pt-4 mt-4">
+                     <label class="block text-xs font-bold uppercase text-gray-500 mb-2">Required Roles (for assignment)</label>
+                     <div class="flex flex-wrap gap-2">
+                         <label 
+                             v-for="role in allRoles" 
+                             :key="role.id"
+                             class="flex items-center gap-2 px-3 py-1.5 rounded border cursor-pointer select-none transition-colors"
+                             :class="selectedRoleIds.includes(role.id) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                         >
+                             <input 
+                                 type="checkbox" 
+                                 :value="role.id" 
+                                 v-model="selectedRoleIds"
+                                 class="hidden"
+                             />
+                             <span class="text-sm font-medium">{{ role.name }}</span>
+                         </label>
+                     </div>
+                     <p v-if="selectedRoleIds.length === 0" class="text-xs text-gray-400 mt-1 italic">
+                         No roles selected = anyone can be assigned
+                     </p>
                  </div>
              </div>
 

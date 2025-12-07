@@ -150,19 +150,22 @@ const showSnoozedOnly = () => {
 }
 
 // Close filter when clicking outside
+const handleGlobalClick = (e) => {
+    const target = e.target
+    if (!target.closest(`#filter-dropdown-${uniqueId}`)) {
+        isFilterOpen.value = false
+    }
+}
+
 onMounted(() => {
-    document.addEventListener('click', (e) => {
-        const target = e.target
-        if (!target.closest(`#filter-dropdown-${uniqueId}`)) {
-            isFilterOpen.value = false
-        }
-    })
+    document.addEventListener('click', handleGlobalClick)
 
     // Setup Polling
     autoRefresh.value = setInterval(() => fetchData(true), 30000)
 })
 
 onUnmounted(() => {
+    document.removeEventListener('click', handleGlobalClick)
     if (autoRefresh.value) clearInterval(autoRefresh.value)
 })
 

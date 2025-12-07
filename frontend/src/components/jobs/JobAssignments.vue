@@ -5,18 +5,37 @@ import { UserPlus, X, Clock, Navigation, Play, Pause, CheckCircle2, AlertCircle 
 
 const props = defineProps({
   jobId: String,
-  jobTitle: String
+  jobTitle: String,
+  jobTemplateId: String
 })
 
 const assignments = ref([])
 const loading = ref(false)
 const availablePeople = ref([])
 const showAddModal = ref(false)
+const requiredRoleIds = ref([])
+
+// Fetch required roles for this job's template
+const fetchRequiredRoles = async () => {
+    if (!props.jobTemplateId) {
+        requiredRoleIds.value = []
+        return
+    }
+    
+    const { data } = await supabase
+        .from('job_template_roles')
+        .select('role_id')
+        .eq('job_template_id', props.jobTemplateId)
+    
+    requiredRoleIds.value = (data || []).map(r => r.role_id)
+}
 
 // Fetch assignments via RPC
 const fetchAssignments = async () => {
   if (!props.jobId) return
   loading.value = true
+  
+  await fetchRequiredRoles()
   
   const { data, error } = await supabase.rpc('get_job_with_assignments', {
     p_job_id: props.jobId
@@ -32,7 +51,7 @@ const fetchAssignments = async () => {
 const fetchAvailablePeople = async () => {
   const { data } = await supabase
     .from('people')
-    .select('id, first_name, last_name, person_roles(roles(name))')
+    .select('id, first_name, last_name, person_roles(role_id, roles(name))')
     .is('deleted_at', null)
     .order('first_name')
   
@@ -40,17 +59,14 @@ const fetchAvailablePeople = async () => {
 }
 
 const filteredPeople = computed(() => {
-    if (!props.jobTitle) return availablePeople.value
+    // If no required roles, anyone can be assigned
+    if (requiredRoleIds.value.length === 0) return availablePeople.value
     
-    // Rule: Kitting jobs require Laundry Technician
-    if (props.jobTitle.toLowerCase().includes('kitting')) {
-        return availablePeople.value.filter(p => {
-            const hasRole = p.person_roles?.some(pr => pr.roles?.name === 'Laundry Technician')
-            return hasRole
-        })
-    }
-    
-    return availablePeople.value
+    // Filter to people who have at least one of the required roles
+    return availablePeople.value.filter(p => {
+        const personRoleIds = (p.person_roles || []).map(pr => pr.role_id)
+        return requiredRoleIds.value.some(reqId => personRoleIds.includes(reqId))
+    })
 })
 
 const addPerson = async (personId) => {
