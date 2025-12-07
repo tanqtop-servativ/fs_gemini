@@ -14,7 +14,7 @@ const props = defineProps({
   initialAction: { type: String, default: null }
 })
 
-const { snoozeOpportunity, unsnoozeOpportunity, dismissOpportunity } = useServiceOpportunities()
+const { snoozeOpportunity, unsnoozeOpportunity, dismissOpportunity, undismissOpportunity } = useServiceOpportunities()
 
 const snoozeInput = ref(null)
 
@@ -152,6 +152,16 @@ const handleUnsnooze = async () => {
     }
 }
 
+const handleUndismiss = async () => {
+    const { success, error } = await undismissOpportunity(props.opportunity.id)
+    
+    if (!success) alert('Error: ' + error)
+    else {
+        emit('refresh')
+        emit('close')
+    }
+}
+
 const statusColor = (s) => {
     if (s === 'Complete' || s === 'Captured') return 'bg-green-100 text-green-700'
     if (s === 'In Progress') return 'bg-blue-100 text-blue-700'
@@ -187,6 +197,12 @@ const statusColor = (s) => {
                 <div v-if="opportunity.status === 'Snoozed'" class="ml-4">
                      <button @click="handleUnsnooze" class="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 transition">
                         <Clock size="12" class="opacity-50" /> Unsnooze
+                    </button>
+                </div>
+
+                <div v-if="opportunity.status === 'Dismissed'" class="ml-4">
+                     <button @click="handleUndismiss" class="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 transition">
+                        <Ban size="12" class="opacity-50" /> Undismiss
                     </button>
                 </div>
 

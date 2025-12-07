@@ -186,12 +186,32 @@ export function useServiceOpportunities() {
         return { success: true }
     }
 
+    /**
+     * Undismiss a service opportunity (Set to Open)
+     * @param {string} id 
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const undismissOpportunity = async (id) => {
+        const { error } = await supabase
+            .from('service_opportunities')
+            .update({
+                status: 'Open',
+                dismissal_reason: null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
     return {
         saveOpportunity,
         deleteOpportunity,
         fetchFormOptions,
         snoozeOpportunity,
         unsnoozeOpportunity,
-        dismissOpportunity
+        dismissOpportunity,
+        undismissOpportunity
     }
 }
