@@ -26,12 +26,7 @@ const fetchJobs = async () => {
         .from('jobs')
         .select(`
             *,
-            job_tasks (id, title, status),
-            job_inputs (
-                id, 
-                value, 
-                job_template_inputs (label, input_type)
-            )
+            job_tasks (id, title, status)
         `)
         .eq('service_opportunity_id', props.opportunity.id)
         .order('id', { ascending: true })

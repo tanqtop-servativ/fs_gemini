@@ -6,6 +6,7 @@ import { ArrowLeft, CheckCircle2, Circle, Calendar, MapPin, Briefcase } from 'lu
 import JobTimer from '../components/jobs/JobTimer.vue'
 import JobComments from '../components/jobs/JobComments.vue'
 import JobPhotos from '../components/jobs/JobPhotos.vue'
+import JobAssignments from '../components/jobs/JobAssignments.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -144,6 +145,9 @@ onMounted(fetchJob)
                   <h3 class="font-bold text-gray-900 mb-2">Instructions</h3>
                   <p class="text-gray-700 whitespace-pre-wrap">{{ job.description }}</p>
               </div>
+
+              <!-- Assignments -->
+              <JobAssignments :jobId="jobId" />
 
               <!-- Tasks -->
               <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">

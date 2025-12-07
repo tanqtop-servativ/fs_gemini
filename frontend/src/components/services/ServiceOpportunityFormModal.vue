@@ -5,7 +5,9 @@ import { X, Save, Calendar, Building, FileText, Smartphone } from 'lucide-vue-ne
 
 const props = defineProps({
   isOpen: Boolean,
-  opportunity: Object
+  opportunity: Object,
+  defaultDate: String,  // For pre-populating from calendar context menu
+  defaultPropertyId: String  // For pre-populating when property is selected in calendar
 })
 
 const emit = defineEmits(['close', 'saved'])
@@ -50,6 +52,14 @@ watch(() => props.isOpen, (open) => {
             form.due_date = props.opportunity.due_date ? props.opportunity.due_date.split('T')[0] : ''
         } else {
             resetForm()
+            // Pre-populate date from calendar context menu
+            if (props.defaultDate) {
+                form.due_date = props.defaultDate
+            }
+            // Pre-populate property from calendar filter
+            if (props.defaultPropertyId) {
+                form.property_id = props.defaultPropertyId
+            }
         }
     }
 })

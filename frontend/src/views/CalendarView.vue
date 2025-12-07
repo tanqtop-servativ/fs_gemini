@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, watch, computed, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -13,6 +13,7 @@ import 'tippy.js/themes/light-border.css'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../composables/useAuth'
 import CalendarEventModal from '../components/calendar/CalendarEventModal.vue'
+import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 
 // Refs for UI state
 const route = useRoute()
@@ -25,6 +26,30 @@ const properties = ref([])
 // Modal state
 const showEventModal = ref(false)
 const selectedEvent = ref(null)
+const showServiceOpportunityModal = ref(false)
+const newOpportunityDate = ref(null)
+
+// Context menu state
+const router = useRouter()
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextMenuEvent = ref(null)
+const contextMenuDate = ref(null)
+
+const closeContextMenu = () => {
+  showContextMenu.value = false
+  contextMenuEvent.value = null
+  contextMenuDate.value = null
+}
+
+// Close context menu on click outside
+onMounted(() => {
+  document.addEventListener('click', closeContextMenu)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu)
+})
 
 // Zoom Control via CSS Transform
 const zoomScale = ref(100) // Percentage: 70% to 130%
@@ -122,11 +147,87 @@ const calendarOptions = {
       allowHTML: true,
       theme: 'light-border'
     })
+    
+    // Add right-click listener for context menu
+    info.el.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      contextMenuX.value = e.clientX
+      contextMenuY.value = e.clientY
+      contextMenuEvent.value = info.event
+      contextMenuDate.value = null
+      showContextMenu.value = true
+    })
   },
   eventClick: (info) => {
     selectedEvent.value = info.event
     showEventModal.value = true
+  },
+  dayCellDidMount: (info) => {
+    // Add right-click listener to day cells (white space)
+    info.el.addEventListener('contextmenu', (e) => {
+      // Only trigger if not clicking on an event
+      if (e.target.closest('.fc-event')) return
+      
+      e.preventDefault()
+      contextMenuX.value = e.clientX
+      contextMenuY.value = e.clientY
+      contextMenuEvent.value = null
+      contextMenuDate.value = info.date.toISOString().split('T')[0]
+      showContextMenu.value = true
+    })
   }
+}
+
+// Handle right-click on events
+const handleEventRightClick = (e, event) => {
+  e.preventDefault()
+  contextMenuX.value = e.clientX
+  contextMenuY.value = e.clientY
+  contextMenuEvent.value = event
+  contextMenuDate.value = null
+  showContextMenu.value = true
+}
+
+// Handle right-click on date cells
+const handleDateRightClick = (e, dateStr) => {
+  e.preventDefault()
+  contextMenuX.value = e.clientX
+  contextMenuY.value = e.clientY
+  contextMenuEvent.value = null
+  contextMenuDate.value = dateStr
+  showContextMenu.value = true
+}
+
+// Context menu actions
+const viewEventDetails = () => {
+  if (contextMenuEvent.value) {
+    selectedEvent.value = contextMenuEvent.value
+    showEventModal.value = true
+  }
+  closeContextMenu()
+}
+
+const copyEventToClipboard = () => {
+  if (contextMenuEvent.value) {
+    const e = contextMenuEvent.value
+    const props = e.extendedProps || {}
+    const text = `${e.title}\nDate: ${e.start?.toLocaleDateString()} - ${e.end?.toLocaleDateString()}\nProperty: ${props.property_name || ''}\nAddress: ${props.property_address || ''}`
+    navigator.clipboard.writeText(text)
+  }
+  closeContextMenu()
+}
+
+const createServiceOpportunity = () => {
+  // Open modal with pre-populated date
+  newOpportunityDate.value = contextMenuDate.value || (contextMenuEvent.value?.start?.toISOString().split('T')[0])
+  showServiceOpportunityModal.value = true
+  closeContextMenu()
+}
+
+const handleOpportunitySaved = () => {
+  showServiceOpportunityModal.value = false
+  newOpportunityDate.value = null
+  fetchEvents() // Refresh calendar
 }
 
 const { userProfile } = useAuth()
@@ -269,6 +370,41 @@ const pageTitle = computed(() => {
       :event="selectedEvent" 
       @close="showEventModal = false" 
     />
+
+    <!-- Service Opportunity Form Modal -->
+    <ServiceOpportunityFormModal
+      :isOpen="showServiceOpportunityModal"
+      :defaultDate="newOpportunityDate"
+      :defaultPropertyId="selectedPropId !== 'all' ? selectedPropId : null"
+      @close="showServiceOpportunityModal = false; newOpportunityDate = null"
+      @saved="handleOpportunitySaved"
+    />
+
+    <!-- Context Menu -->
+    <div 
+      v-if="showContextMenu" 
+      class="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[180px]"
+      :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
+      @click.stop
+    >
+      <template v-if="contextMenuEvent">
+        <button @click="viewEventDetails" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2">
+          📋 View Details
+        </button>
+        <button @click="copyEventToClipboard" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2">
+          📄 Copy to Clipboard
+        </button>
+        <div class="border-t border-gray-100 my-1"></div>
+        <button @click="createServiceOpportunity" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2">
+          ➕ Create Service Opportunity
+        </button>
+      </template>
+      <template v-else-if="contextMenuDate">
+        <button @click="createServiceOpportunity" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2">
+          ➕ Create Service Opportunity for {{ contextMenuDate }}
+        </button>
+      </template>
+    </div>
   </div>
 </template>
 
