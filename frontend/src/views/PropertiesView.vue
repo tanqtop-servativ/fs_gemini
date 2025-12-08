@@ -1,9 +1,10 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Home, Calendar as CalendarIcon, Plus, Eye } from 'lucide-vue-next'
+import { Home, Calendar as CalendarIcon, Plus, Eye, Zap } from 'lucide-vue-next'
 import PropertyDetailModal from '../components/properties/PropertyDetailModal.vue'
 import PropertyFormModal from '../components/properties/PropertyFormModal.vue'
+import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import { useAuth } from '../composables/useAuth'
 import { useProperties } from '../composables/useProperties'
 
@@ -17,6 +18,14 @@ const showArchived = ref(false)
 const showDetailModal = ref(false)
 const showFormModal = ref(false)
 const selectedProperty = ref(null)
+
+// Service Opportunity Modal State
+const showServiceOppModal = ref(false)
+const contextMenuProperty = ref(null)
+const defaultServiceOppDate = ref('')
+
+// Context Menu State
+const contextMenu = ref({ show: false, x: 0, y: 0 })
 
 // Data Fetching
 const { userProfile } = useAuth()
@@ -84,6 +93,37 @@ const handleSaved = () => {
   fetchProperties()
   showFormModal.value = false
 }
+
+// Context Menu Handlers
+const handleContextMenu = (event, prop) => {
+  event.preventDefault()
+  contextMenuProperty.value = prop
+  contextMenu.value = {
+    show: true,
+    x: event.clientX,
+    y: event.clientY
+  }
+}
+
+const closeContextMenu = () => {
+  contextMenu.value.show = false
+}
+
+const openServiceOppModal = () => {
+  // Set default date to 1 hour from now
+  const oneHourFromNow = new Date()
+  oneHourFromNow.setHours(oneHourFromNow.getHours() + 1)
+  defaultServiceOppDate.value = oneHourFromNow.toISOString().split('T')[0]
+  
+  showServiceOppModal.value = true
+  closeContextMenu()
+}
+
+const handleServiceOppSaved = () => {
+  showServiceOppModal.value = false
+  // Optionally navigate to service opportunities
+  router.push({ name: 'service-opportunities' })
+}
 </script>
 
 <template>
@@ -139,6 +179,7 @@ const handleSaved = () => {
             :key="prop.id" 
             class="group hover:bg-slate-50 transition-colors cursor-pointer"
             @click="openDetail(prop)"
+            @contextmenu="handleContextMenu($event, prop)"
           >
             <!-- Property Name & Photo -->
             <td class="px-6 py-4">
@@ -219,5 +260,54 @@ const handleSaved = () => {
       @close="showFormModal = false"
       @saved="handleSaved"
     />
+    
+    <ServiceOpportunityFormModal
+      :is-open="showServiceOppModal"
+      :default-property-id="contextMenuProperty?.id"
+      :default-date="defaultServiceOppDate"
+      @close="showServiceOppModal = false"
+      @saved="handleServiceOppSaved"
+    />
+    
+    <!-- Context Menu -->
+    <Teleport to="body">
+      <div 
+        v-if="contextMenu.show" 
+        class="fixed inset-0 z-50"
+        @click="closeContextMenu"
+        @contextmenu.prevent="closeContextMenu"
+      >
+        <div 
+          class="absolute bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[180px]"
+          :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+          @click.stop
+        >
+          <div class="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 truncate max-w-[200px]">
+            {{ contextMenuProperty?.name }}
+          </div>
+          <button 
+            @click="openServiceOppModal"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+          >
+            <Zap class="w-4 h-4" />
+            New Service Opportunity
+          </button>
+          <button 
+            @click="openCalendar(contextMenuProperty); closeContextMenu()"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+          >
+            <CalendarIcon class="w-4 h-4" />
+            View Calendar
+          </button>
+          <button 
+            @click="openDetail(contextMenuProperty); closeContextMenu()"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+          >
+            <Eye class="w-4 h-4" />
+            View Details
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
