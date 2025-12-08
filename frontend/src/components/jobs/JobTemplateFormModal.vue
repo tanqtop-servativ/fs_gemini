@@ -2,6 +2,7 @@
 import { ref, watch, reactive } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useJobTemplates } from '../../composables/useJobTemplates'
+import { useAuth } from '../../composables/useAuth'
 import { X, Save, Plus, GripVertical, Trash2, Book, CheckSquare, PenTool } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 import TaskLibraryModal from './TaskLibraryModal.vue'
@@ -15,6 +16,7 @@ const emit = defineEmits(['close', 'saved'])
 
 // Composables
 const { saveTemplate, archiveTemplate, restoreTemplate } = useJobTemplates()
+const { userProfile } = useAuth()
 
 const saving = ref(false)
 const showLibrary = ref(false)
@@ -32,9 +34,17 @@ const form = reactive({
 
 // Fetch available roles
 const fetchRoles = async () => {
+    const tenantId = userProfile.value?.tenant_id
+    if (!tenantId) {
+        allRoles.value = []
+        return
+    }
+    
     const { data } = await supabase
         .from('roles')
         .select('id, name')
+        .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .order('name')
     allRoles.value = data || []
 }
