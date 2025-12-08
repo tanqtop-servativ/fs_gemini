@@ -85,6 +85,18 @@ const router = createRouter({
             name: 'bom-templates',
             component: () => import('../views/BOMTemplatesView.vue'),
             meta: { requiresAuth: true }
+        },
+        {
+            path: '/analytics',
+            name: 'analytics',
+            component: () => import('../views/AnalyticsDashboardView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/worker',
+            name: 'worker-home',
+            component: () => import('../views/WorkerHomeView.vue'),
+            meta: { requiresAuth: true }
         }
     ]
 })
