@@ -5,8 +5,11 @@ import { Home, Calendar as CalendarIcon, Plus, Eye, Zap } from 'lucide-vue-next'
 import PropertyDetailModal from '../components/properties/PropertyDetailModal.vue'
 import PropertyFormModal from '../components/properties/PropertyFormModal.vue'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
+import SortableHeader from '../components/SortableHeader.vue'
+import TableSearch from '../components/TableSearch.vue'
 import { useAuth } from '../composables/useAuth'
 import { useProperties } from '../composables/useProperties'
+import { useTableControls } from '../composables/useTableControls'
 
 const router = useRouter()
 const route = useRoute()
@@ -30,6 +33,16 @@ const contextMenu = ref({ show: false, x: 0, y: 0 })
 // Data Fetching
 const { userProfile } = useAuth()
 const { fetchPropertiesEnriched } = useProperties()
+
+// Table controls
+const { 
+    sortKey, sortDir, searchQuery, 
+    processedItems, toggleSort, resetControls, hasActiveControls 
+} = useTableControls(properties, {
+    defaultSortKey: 'name',
+    defaultSortDir: 'asc',
+    searchableFields: ['name', 'display_address', 'owner_names', 'manager_names']
+})
 
 const fetchProperties = async () => {
   const tenantId = userProfile.value?.tenant_id
@@ -139,6 +152,13 @@ const handleServiceOppSaved = () => {
       </div>
       
       <div class="flex items-center gap-4">
+        <TableSearch 
+            v-model="searchQuery" 
+            :has-active-controls="hasActiveControls"
+            @reset="resetControls"
+            placeholder="Search properties..."
+        />
+        
         <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
           <input type="checkbox" v-model="showArchived" class="rounded border-gray-300 text-black focus:ring-0">
           Show Archived
@@ -159,9 +179,15 @@ const handleServiceOppSaved = () => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Property</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Address</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Assignments</th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="name" :sort-dir="sortDir" @sort="toggleSort">Property</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="display_address" :sort-dir="sortDir" @sort="toggleSort">Address</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="owner_names" :sort-dir="sortDir" @sort="toggleSort">Assignments</SortableHeader>
+            </th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
         </thead>
@@ -170,12 +196,12 @@ const handleServiceOppSaved = () => {
             <td colspan="4" class="px-6 py-8 text-center text-gray-400">Loading properties...</td>
           </tr>
           
-          <tr v-else-if="properties.length === 0">
+          <tr v-else-if="processedItems.length === 0">
             <td colspan="4" class="px-6 py-8 text-center text-gray-400">No properties found.</td>
           </tr>
           
           <tr 
-            v-for="prop in properties" 
+            v-for="prop in processedItems" 
             :key="prop.id" 
             class="group hover:bg-slate-50 transition-colors cursor-pointer"
             @click="openDetail(prop)"

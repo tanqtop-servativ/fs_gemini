@@ -1,9 +1,12 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Eye, ArrowRight, ChevronDown, Check, Briefcase } from 'lucide-vue-next'
+import { Eye, ChevronDown, Check, Briefcase } from 'lucide-vue-next'
 import { useAuth } from '../composables/useAuth'
 import { useJobs } from '../composables/useJobs'
+import { useTableControls } from '../composables/useTableControls'
+import SortableHeader from '../components/SortableHeader.vue'
+import TableSearch from '../components/TableSearch.vue'
 
 const router = useRouter()
 
@@ -17,6 +20,16 @@ const allStatuses = ['Pending', 'In Progress', 'Complete', 'Cancelled']
 
 const { userProfile } = useAuth()
 const { fetchJobs, getStatusColor } = useJobs()
+
+// Table controls
+const { 
+    sortKey, sortDir, searchQuery, 
+    processedItems, toggleSort, resetControls, hasActiveControls 
+} = useTableControls(items, {
+    defaultSortKey: 'title',
+    defaultSortDir: 'asc',
+    searchableFields: ['title', 'properties.name', 'service_opportunities.title', 'status']
+})
 
 const fetchData = async () => {
     const tenantId = userProfile.value?.tenant_id
@@ -78,6 +91,15 @@ const goToJob = (job) => {
       </div>
       
       <div class="flex items-center gap-4">
+        <!-- Search & Reset -->
+        <TableSearch 
+            v-model="searchQuery" 
+            :has-active-controls="hasActiveControls"
+            @reset="resetControls"
+            placeholder="Search jobs..."
+        />
+        
+        <!-- Status Filter -->
         <div class="relative" :id="'filter-dropdown-' + uniqueId">
             <button 
                 @click="isFilterOpen = !isFilterOpen"
@@ -114,10 +136,18 @@ const goToJob = (job) => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Job</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Property</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Service Opportunity</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Status</th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="title" :sort-dir="sortDir" @sort="toggleSort">Job</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="properties.name" :sort-dir="sortDir" @sort="toggleSort">Property</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="service_opportunities.title" :sort-dir="sortDir" @sort="toggleSort">Service Opportunity</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="status" :sort-dir="sortDir" @sort="toggleSort">Status</SortableHeader>
+            </th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
         </thead>
@@ -125,11 +155,11 @@ const goToJob = (job) => {
            <tr v-if="loading">
              <td colspan="5" class="px-6 py-8 text-center text-gray-400">Loading jobs...</td>
            </tr>
-           <tr v-else-if="items.length === 0">
+           <tr v-else-if="processedItems.length === 0">
              <td colspan="5" class="px-6 py-8 text-center text-gray-400">No jobs found.</td>
            </tr>
 
-           <tr v-for="item in items" :key="item.id" 
+           <tr v-for="item in processedItems" :key="item.id" 
                 class="group hover:bg-slate-50 transition-colors cursor-pointer" 
                 @click="goToJob(item)"
             >
