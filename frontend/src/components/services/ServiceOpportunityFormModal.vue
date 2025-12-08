@@ -157,28 +157,18 @@ const handleClose = () => {
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <!-- Source -->
-                <div>
-                    <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Source</label>
-                    <div class="relative">
-                         <Smartphone class="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
-                         <select v-model="form.trigger_source" class="w-full pl-9 pr-2 py-2 border border-gray-300 rounded focus:ring-blue-500 bg-white text-sm">
-                             <option value="Manual">Manual Entry</option>
-                             <option value="Phone">Phone Call</option>
-                             <option value="Email">Email</option>
-                             <option value="Text">Text Message</option>
-                             <option value="In Person">In Person</option>
-                         </select>
-                    </div>
-                </div>
-                <!-- Date -->
-                <div>
-                    <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Due Date</label>
-                    <div class="relative">
-                         <Calendar class="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
-                         <input v-model="form.due_date" type="date" class="w-full pl-9 pr-2 py-2 border border-gray-300 rounded focus:ring-blue-500 bg-white text-sm">
-                    </div>
+            <!-- Source -->
+            <div>
+                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Source</label>
+                <div class="relative">
+                     <Smartphone class="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                     <select v-model="form.trigger_source" class="w-full pl-9 pr-2 py-2 border border-gray-300 rounded focus:ring-blue-500 bg-white text-sm">
+                         <option value="Manual">Manual Entry</option>
+                         <option value="Phone">Phone Call</option>
+                         <option value="Email">Email</option>
+                         <option value="Text">Text Message</option>
+                         <option value="In Person">In Person</option>
+                     </select>
                 </div>
             </div>
 
