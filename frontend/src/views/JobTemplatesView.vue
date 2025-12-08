@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
-import { Plus, Eye, ListChecks } from 'lucide-vue-next'
+import { Plus, Eye, ListChecks, Wrench } from 'lucide-vue-next'
 import JobTemplateFormModal from '../components/jobs/JobTemplateFormModal.vue'
 import JobTemplateDetailModal from '../components/jobs/JobTemplateDetailModal.vue'
 import SortableHeader from '../components/SortableHeader.vue'
@@ -138,6 +138,7 @@ const handleSaved = () => {
              <!-- Name -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900 flex items-center gap-2" :class="{ 'line-through text-gray-500': t.deleted_at }">
+                     <Wrench size="16" class="text-blue-500" />
                      {{ t.name }}
                      <span v-if="t.deleted_at" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase no-underline">Archived</span>
                  </div>
