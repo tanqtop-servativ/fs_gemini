@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { Home, Calendar, Users, ClipboardList, LogOut, GitMerge, Package, Shield, Activity, Zap, X, LayoutDashboard, Briefcase } from 'lucide-vue-next'
+import { Home, Calendar, Users, ClipboardList, LogOut, GitMerge, Package, Shield, Activity, Zap, X, LayoutDashboard, Briefcase, BarChart3 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
@@ -24,6 +24,7 @@ const menuItems = [
   { name: 'Properties', path: '/properties', icon: Home },
   { name: 'Staff & Users', path: '/people', icon: Users },
   { name: 'Activity Feed', path: '/activity', icon: Activity },
+  { name: 'Analytics', path: '/analytics', icon: BarChart3 },
 ]
 
 const handleLogout = async () => {
