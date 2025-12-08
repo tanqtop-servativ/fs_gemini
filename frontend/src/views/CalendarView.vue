@@ -137,7 +137,8 @@ const calendarOptions = {
     const fmt = (d) => d ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
     const timeStr = `${fmt(info.event.start)} - ${fmt(info.event.end)}`
     
-    tippy(info.el, {
+    // Create tippy instance and store reference for cleanup
+    const tippyInstance = tippy(info.el, {
       content: `
         <div class="font-bold">${info.event.title}</div>
         <div class="text-xs text-gray-600 border-b border-gray-200 pb-1 mb-1">${timeStr}</div>
@@ -148,23 +149,42 @@ const calendarOptions = {
       theme: 'light-border'
     })
     
-    // Add right-click listener for context menu
-    info.el.addEventListener('contextmenu', (e) => {
+    // Store tippy instance on element for cleanup
+    info.el._tippyInstance = tippyInstance
+    
+    // Create named handler for cleanup
+    const contextMenuHandler = (e) => {
       e.preventDefault()
       contextMenuX.value = e.clientX
       contextMenuY.value = e.clientY
       contextMenuEvent.value = info.event
       contextMenuDate.value = null
       showContextMenu.value = true
-    })
+    }
+    
+    // Store handler reference for removal
+    info.el._contextMenuHandler = contextMenuHandler
+    info.el.addEventListener('contextmenu', contextMenuHandler)
+  },
+  eventWillUnmount: (info) => {
+    // Clean up tippy instance
+    if (info.el._tippyInstance) {
+      info.el._tippyInstance.destroy()
+      delete info.el._tippyInstance
+    }
+    // Clean up context menu listener
+    if (info.el._contextMenuHandler) {
+      info.el.removeEventListener('contextmenu', info.el._contextMenuHandler)
+      delete info.el._contextMenuHandler
+    }
   },
   eventClick: (info) => {
     selectedEvent.value = info.event
     showEventModal.value = true
   },
   dayCellDidMount: (info) => {
-    // Add right-click listener to day cells (white space)
-    info.el.addEventListener('contextmenu', (e) => {
+    // Create named handler for cleanup
+    const dayCellContextMenuHandler = (e) => {
       // Only trigger if not clicking on an event
       if (e.target.closest('.fc-event')) return
       
@@ -174,7 +194,18 @@ const calendarOptions = {
       contextMenuEvent.value = null
       contextMenuDate.value = info.date.toISOString().split('T')[0]
       showContextMenu.value = true
-    })
+    }
+    
+    // Store handler reference for removal
+    info.el._dayCellContextMenuHandler = dayCellContextMenuHandler
+    info.el.addEventListener('contextmenu', dayCellContextMenuHandler)
+  },
+  dayCellWillUnmount: (info) => {
+    // Clean up day cell context menu listener
+    if (info.el._dayCellContextMenuHandler) {
+      info.el.removeEventListener('contextmenu', info.el._dayCellContextMenuHandler)
+      delete info.el._dayCellContextMenuHandler
+    }
   }
 }
 

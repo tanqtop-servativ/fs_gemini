@@ -60,6 +60,9 @@ export function useAuth() {
         return user.value?.id
     })
 
+    // Track auth subscription to prevent duplicates
+    let authSubscription = null
+
     const initAuth = async () => {
         loading.value = true
         const { data } = await supabase.auth.getSession()
@@ -71,15 +74,19 @@ export function useAuth() {
 
         loading.value = false
 
-        supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (session?.user) {
-                user.value = session.user
-                await fetchProfile(session.user.id)
-            } else {
-                user.value = null
-                userProfile.value = null
-            }
-        })
+        // Only set up listener if not already subscribed
+        if (!authSubscription) {
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+                if (session?.user) {
+                    user.value = session.user
+                    await fetchProfile(session.user.id)
+                } else {
+                    user.value = null
+                    userProfile.value = null
+                }
+            })
+            authSubscription = subscription
+        }
     }
 
     const fetchProfile = async (userId) => {
