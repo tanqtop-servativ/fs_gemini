@@ -4,6 +4,10 @@ import { supabase } from '../lib/supabase'
 import { Plus, Eye, ListChecks } from 'lucide-vue-next'
 import JobTemplateFormModal from '../components/jobs/JobTemplateFormModal.vue'
 import JobTemplateDetailModal from '../components/jobs/JobTemplateDetailModal.vue'
+import SortableHeader from '../components/SortableHeader.vue'
+import TableSearch from '../components/TableSearch.vue'
+import { useAuth } from '../composables/useAuth'
+import { useTableControls } from '../composables/useTableControls'
 
 const templates = ref([])
 const loading = ref(true)
@@ -14,9 +18,17 @@ const showForm = ref(false)
 const showDetail = ref(false)
 const selectedTemplate = ref(null)
 
-import { useAuth } from '../composables/useAuth'
-
 const { userProfile } = useAuth()
+
+// Table controls
+const { 
+    sortKey, sortDir, searchQuery, 
+    processedItems, toggleSort, resetControls, hasActiveControls 
+} = useTableControls(templates, {
+    defaultSortKey: 'name',
+    defaultSortDir: 'asc',
+    searchableFields: ['name', 'name_es', 'description']
+})
 
 const fetchData = async () => {
     const tenantId = userProfile.value?.tenant_id
@@ -77,6 +89,13 @@ const handleSaved = () => {
       </div>
       
       <div class="flex items-center gap-4">
+        <TableSearch 
+            v-model="searchQuery" 
+            :has-active-controls="hasActiveControls"
+            @reset="resetControls"
+            placeholder="Search templates..."
+        />
+        
         <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
           <input type="checkbox" v-model="showArchived" class="rounded border-gray-300 text-black focus:ring-0">
           Show Archived
@@ -97,8 +116,12 @@ const handleSaved = () => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Template Name</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Description</th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="name" :sort-dir="sortDir" @sort="toggleSort">Template Name</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="description" :sort-dir="sortDir" @sort="toggleSort">Description</SortableHeader>
+            </th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Tasks</th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
@@ -107,11 +130,11 @@ const handleSaved = () => {
            <tr v-if="loading">
              <td colspan="4" class="px-6 py-8 text-center text-gray-400">Loading templates...</td>
            </tr>
-           <tr v-else-if="templates.length === 0">
+           <tr v-else-if="processedItems.length === 0">
              <td colspan="4" class="px-6 py-8 text-center text-gray-400">No templates found. Create one to get started.</td>
            </tr>
 
-           <tr v-for="t in templates" :key="t.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
+           <tr v-for="t in processedItems" :key="t.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
              <!-- Name -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900 flex items-center gap-2" :class="{ 'line-through text-gray-500': t.deleted_at }">

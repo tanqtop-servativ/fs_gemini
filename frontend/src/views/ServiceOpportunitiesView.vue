@@ -5,8 +5,11 @@ import { Plus, Eye, ArrowRight, ChevronDown, Check, Clock, Ban, Moon } from 'luc
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import ServiceOpportunityDetailModal from '../components/services/ServiceOpportunityDetailModal.vue'
 import ContextMenu from '../components/ContextMenu.vue'
+import SortableHeader from '../components/SortableHeader.vue'
+import TableSearch from '../components/TableSearch.vue'
 import { useAuth } from '../composables/useAuth'
 import { useServiceOpportunities } from '../composables/useServiceOpportunities'
+import { useTableControls } from '../composables/useTableControls'
 
 const router = useRouter()
 const route = useRoute()
@@ -48,6 +51,16 @@ const {
     unsnoozeOpportunity, 
     undismissOpportunity 
 } = useServiceOpportunities()
+
+// Table controls
+const { 
+    sortKey, sortDir, searchQuery, 
+    processedItems, toggleSort: toggleTableSort, resetControls, hasActiveControls 
+} = useTableControls(items, {
+    defaultSortKey: 'properties.name',
+    defaultSortDir: 'asc',
+    searchableFields: ['properties.name', 'service_templates.name', 'status', 'trigger_source']
+})
 
 const fetchData = async (isBackground = false) => {
     const tenantId = userProfile.value?.tenant_id
@@ -235,6 +248,12 @@ const handleContextMenu = (e, item) => {
     </div>
       
       <div class="flex items-center gap-4">
+        <TableSearch 
+            v-model="searchQuery" 
+            :has-active-controls="hasActiveControls"
+            @reset="resetControls"
+            placeholder="Search opportunities..."
+        />
         <div class="relative" :id="'filter-dropdown-' + uniqueId">
             <button 
                 @click="isFilterOpen = !isFilterOpen"
@@ -279,9 +298,15 @@ const handleContextMenu = (e, item) => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Property</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Service</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Status</th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="properties.name" :sort-dir="sortDir" @sort="toggleTableSort">Property</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="service_templates.name" :sort-dir="sortDir" @sort="toggleTableSort">Service</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="status" :sort-dir="sortDir" @sort="toggleTableSort">Status</SortableHeader>
+            </th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Workflows</th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
@@ -290,11 +315,11 @@ const handleContextMenu = (e, item) => {
            <tr v-if="loading">
              <td colspan="5" class="px-6 py-8 text-center text-gray-400">Loading opportunities...</td>
            </tr>
-           <tr v-else-if="items.length === 0">
+           <tr v-else-if="processedItems.length === 0">
              <td colspan="5" class="px-6 py-8 text-center text-gray-400">No opportunities found.</td>
            </tr>
 
-           <tr v-for="item in items" :key="item.id" 
+           <tr v-for="item in processedItems" :key="item.id" 
                 class="group hover:bg-slate-50 transition-colors cursor-pointer select-none" 
                 @click="openDetail(item)"
                 @contextmenu.prevent.stop="handleContextMenu($event, item)"

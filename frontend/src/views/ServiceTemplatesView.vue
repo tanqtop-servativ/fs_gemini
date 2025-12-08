@@ -4,6 +4,10 @@ import { supabase } from '../lib/supabase'
 import { Plus, Eye, GitMerge } from 'lucide-vue-next'
 import ServiceTemplateFormModal from '../components/services/ServiceTemplateFormModal.vue'
 import ServiceTemplateDetailModal from '../components/services/ServiceTemplateDetailModal.vue'
+import SortableHeader from '../components/SortableHeader.vue'
+import TableSearch from '../components/TableSearch.vue'
+import { useAuth } from '../composables/useAuth'
+import { useTableControls } from '../composables/useTableControls'
 
 const templates = ref([])
 const loading = ref(true)
@@ -13,10 +17,17 @@ const showForm = ref(false)
 const showDetail = ref(false)
 const selectedTemplate = ref(null)
 
-import { useAuth } from '../composables/useAuth'
-
-// ...
 const { userProfile } = useAuth()
+
+// Table controls
+const { 
+    sortKey, sortDir, searchQuery, 
+    processedItems, toggleSort, resetControls, hasActiveControls 
+} = useTableControls(templates, {
+    defaultSortKey: 'name',
+    defaultSortDir: 'asc',
+    searchableFields: ['name', 'description']
+})
 
 const fetchData = async () => {
     // If profile not ready, skip. Watcher will re-trigger.
@@ -71,13 +82,22 @@ const handleSaved = () => {
         <p class="text-gray-500 text-sm">Define standard service workflows (e.g. Turnaround, Warranty)</p>
       </div>
       
-      <button 
-        @click="openNew"
-        class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-slate-800 transition shadow-sm"
-      >
-        <Plus class="w-4 h-4 mr-2" />
-        New Service
-      </button>
+      <div class="flex items-center gap-4">
+        <TableSearch 
+            v-model="searchQuery" 
+            :has-active-controls="hasActiveControls"
+            @reset="resetControls"
+            placeholder="Search services..."
+        />
+        
+        <button 
+          @click="openNew"
+          class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center hover:bg-slate-800 transition shadow-sm"
+        >
+          <Plus class="w-4 h-4 mr-2" />
+          New Service
+        </button>
+      </div>
     </div>
 
     <!-- Table -->
@@ -85,8 +105,12 @@ const handleSaved = () => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Service Name</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Description</th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="name" :sort-dir="sortDir" @sort="toggleSort">Service Name</SortableHeader>
+            </th>
+            <th class="px-6 py-4">
+                <SortableHeader :sort-key="sortKey" column="description" :sort-dir="sortDir" @sort="toggleSort">Description</SortableHeader>
+            </th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Workflow Steps</th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
@@ -95,11 +119,11 @@ const handleSaved = () => {
            <tr v-if="loading">
              <td colspan="4" class="px-6 py-8 text-center text-gray-400">Loading services...</td>
            </tr>
-           <tr v-else-if="templates.length === 0">
+           <tr v-else-if="processedItems.length === 0">
              <td colspan="4" class="px-6 py-8 text-center text-gray-400">No services defined. Create one to get started.</td>
            </tr>
 
-           <tr v-for="t in templates" :key="t.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
+           <tr v-for="t in processedItems" :key="t.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
              <!-- Name -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900">{{ t.name }}</div>
