@@ -11,7 +11,7 @@ const props = defineProps({
   template: Object
 })
 
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close', 'saved', 'deleted'])
 
 const loading = ref(false)
 const saving = ref(false)
@@ -121,6 +121,23 @@ const handleSave = async () => {
     }
 }
 
+const handleDelete = async () => {
+    if (!props.template?.id) return
+    if (!confirm("Are you sure you want to delete this service template? This cannot be undone.")) return
+    
+    const { error } = await supabase
+        .from('service_templates')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', props.template.id)
+    
+    if (error) {
+        alert("Error deleting: " + error.message)
+    } else {
+        emit('deleted')
+        emit('close')
+    }
+}
+
 const handleClose = () => {
     if (initialState.value && getSnapshot() !== initialState.value) {
         if (!confirm("You have unsaved changes. Are you sure you want to close?")) return
@@ -224,12 +241,19 @@ const handleClose = () => {
         </div>
 
         <!-- Footer -->
-        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-            <button @click="handleClose" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
-            <button @click="handleSave" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center transition disabled:opacity-50">
-                <Save size="16" class="mr-2" />
-                {{ saving ? 'Saving...' : 'Save Workflow' }}
-            </button>
+        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+            <div>
+                <button v-if="template" @click="handleDelete" class="text-red-500 text-sm font-bold hover:bg-red-50 px-3 py-2 rounded flex items-center">
+                    <Trash2 size="16" class="mr-2" /> Delete
+                </button>
+            </div>
+            <div class="flex gap-3">
+                <button @click="handleClose" class="px-4 py-2 hover:bg-gray-200 rounded text-sm font-bold text-gray-600 transition">Cancel</button>
+                <button @click="handleSave" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center transition disabled:opacity-50">
+                    <Save size="16" class="mr-2" />
+                    {{ saving ? 'Saving...' : 'Save Workflow' }}
+                </button>
+            </div>
         </div>
 
     </div>

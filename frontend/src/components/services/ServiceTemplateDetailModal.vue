@@ -76,13 +76,6 @@ const handleDelete = async () => {
 
         </div>
         
-        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-             <button @click="handleDelete" class="text-red-500 text-sm font-bold hover:bg-red-50 px-3 py-2 rounded flex items-center">
-                 <Trash2 size="16" class="mr-2" /> Delete
-             </button>
-
-        </div>
-
     </div>
   </div>
 </template>
