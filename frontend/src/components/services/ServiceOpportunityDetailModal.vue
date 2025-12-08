@@ -285,7 +285,7 @@ const statusColor = (s) => {
                      <div class="flex items-center gap-2 overflow-x-auto pb-2">
                          <div v-for="(job, idx) in jobs" :key="'flow-' + job.id" class="flex items-center">
                              <div class="px-3 py-1 rounded text-xs font-bold border whitespace-nowrap" :class="statusColor(job.status)">
-                                 {{ job.type }}
+                                 {{ job.title || job.type || 'Untitled' }}
                              </div>
                              <ArrowRight v-if="idx < jobs.length - 1" class="mx-2 text-gray-300" size="14" />
                          </div>
@@ -300,7 +300,7 @@ const statusColor = (s) => {
                                     class="flex-1 bg-white p-2 rounded border border-gray-200 flex items-center justify-between cursor-pointer hover:border-blue-300 transition"
                                     @click="router.push(`/jobs/${job.id}`)"
                                  >
-                                    <h5 class="font-bold text-slate-800 text-sm">{{ job.type }}</h5>
+                                    <h5 class="font-bold text-slate-800 text-sm">{{ job.title || job.type || 'Untitled' }}</h5>
                                     <span class="text-[10px] px-2 py-0.5 rounded font-bold" :class="statusColor(job.status)">{{ job.status }}</span>
                                  </div>
                              </div>
