@@ -15,16 +15,16 @@ const isSuperuser = computed(() => userProfile.value?.is_superuser)
 
 const menuItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Calendar', path: '/calendar', icon: Calendar },
   { name: 'Service Opps', path: '/service-opportunities', icon: Zap },
+  { name: 'Calendar', path: '/calendar', icon: Calendar },
   { name: 'Jobs', path: '/jobs', icon: Briefcase },
-  { name: 'Job Templates', path: '/job-templates', icon: ClipboardList },
   { name: 'Service Templates', path: '/service-templates', icon: GitMerge },
+  { name: 'Job Templates', path: '/job-templates', icon: ClipboardList },
   { name: 'BOM Templates', path: '/bom-templates', icon: Package },
   { name: 'Properties', path: '/properties', icon: Home },
   { name: 'Staff & Users', path: '/people', icon: Users },
-  { name: 'Activity Feed', path: '/activity', icon: Activity },
   { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+  { name: 'Activity Feed', path: '/activity', icon: Activity },
 ]
 
 const handleLogout = async () => {
