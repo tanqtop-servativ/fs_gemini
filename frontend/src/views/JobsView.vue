@@ -1,9 +1,9 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '../lib/supabase'
 import { Eye, ArrowRight, ChevronDown, Check, Briefcase } from 'lucide-vue-next'
 import { useAuth } from '../composables/useAuth'
+import { useJobs } from '../composables/useJobs'
 
 const router = useRouter()
 
@@ -16,6 +16,7 @@ const uniqueId = Math.random().toString(36).substr(2, 9)
 const allStatuses = ['Pending', 'In Progress', 'Complete', 'Cancelled']
 
 const { userProfile } = useAuth()
+const { fetchJobs, getStatusColor } = useJobs()
 
 const fetchData = async () => {
     const tenantId = userProfile.value?.tenant_id
@@ -23,23 +24,11 @@ const fetchData = async () => {
     
     loading.value = true
     
-    let query = supabase
-        .from('jobs')
-        .select(`
-            *,
-            properties (name),
-            service_opportunities (title, due_date)
-        `)
-        .eq('tenant_id', tenantId)
-        .is('deleted_at', null)
-    
-    if (statusFilter.value.length > 0) {
-        query = query.in('status', statusFilter.value)
+    const result = await fetchJobs({ statusFilter: statusFilter.value })
+    if (result.success) {
+        items.value = result.jobs
     }
     
-    const { data } = await query.order('created_at', { ascending: false })
-    
-    items.value = data || []
     loading.value = false
 }
 
@@ -68,20 +57,12 @@ onMounted(() => {
     document.addEventListener('click', handleGlobalClick)
 })
 
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
     document.removeEventListener('click', handleGlobalClick)
 })
 
 const goToJob = (job) => {
     router.push(`/jobs/${job.id}`)
-}
-
-const getStatusColor = (status) => {
-    if (status === 'Complete') return 'bg-green-100 text-green-700'
-    if (status === 'In Progress') return 'bg-blue-100 text-blue-700'
-    if (status === 'Cancelled') return 'bg-red-100 text-red-700'
-    return 'bg-gray-100 text-gray-600'
 }
 </script>
 

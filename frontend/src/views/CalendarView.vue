@@ -10,8 +10,8 @@ import interactionPlugin from '@fullcalendar/interaction'
 import tippy from 'tippy.js'
 import 'tippy.js/dist/tippy.css'
 import 'tippy.js/themes/light-border.css'
-import { supabase } from '../lib/supabase'
 import { useAuth } from '../composables/useAuth'
+import { useCalendar } from '../composables/useCalendar'
 import CalendarEventModal from '../components/calendar/CalendarEventModal.vue'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 
@@ -231,63 +231,28 @@ const handleOpportunitySaved = () => {
 }
 
 const { userProfile } = useAuth()
+const { fetchProperties: fetchPropertiesApi, fetchEvents: fetchEventsApi } = useCalendar()
 
 // Data Fetching
-const fetchProperties = async () => {
-    // Rely on RLS, but ensure auth is ready
+const fetchPropertiesData = async () => {
     if (!userProfile.value?.tenant_id) return
-    const { data } = await supabase
-        .from('properties')
-        .select('id, name')
-        .eq('tenant_id', userProfile.value.tenant_id)
-        .eq('status', 'active')
-        .is('deleted_at', null)
-        .order('name')
-        
-    if (data) properties.value = data
+    const result = await fetchPropertiesApi()
+    if (result.success) {
+        properties.value = result.properties
+    }
 }
 
 const fetchEvents = async () => {
     if (!userProfile.value) return
     
-  const calApi = calendarRef.value?.getApi()
-  if (!calApi) return
-  
-  let query = supabase.from('master_calendar').select('*')
-  
-  if (selectedPropId.value !== 'all') {
-    // Specific property: show ALL events (including iCal bookings)
-    query = query.eq('property_id', selectedPropId.value)
-  } else {
-    // All Properties: show only Jobs/Services, exclude iCal bookings to keep view manageable
-    query = query.neq('event_type', 'Booking')
-  }
-  
-  const { data, error } = await query
-  if (error) {
-    console.error(error)
-    return
-  }
-  
-  const fcEvents = data.map(evt => ({
-    id: evt.id,
-    title: evt.title,
-    start: evt.start_date,
-    end: evt.end_date,
-    color: evt.color,
-    classNames: [evt.class_name],
-    allDay: evt.all_day,
-    extendedProps: {
-      description: evt.description,
-      property_name: evt.property_name,
-      property_address: evt.property_address,
-      event_type: evt.event_type,
-      code: evt.code
+    const calApi = calendarRef.value?.getApi()
+    if (!calApi) return
+    
+    const result = await fetchEventsApi({ propertyId: selectedPropId.value })
+    if (result.success) {
+        calApi.removeAllEvents()
+        calApi.addEventSource(result.events)
     }
-  }))
-  
-  calApi.removeAllEvents()
-  calApi.addEventSource(fcEvents)
 }
 
 watch(() => route.query.propertyId, (newId) => {
@@ -296,7 +261,7 @@ watch(() => route.query.propertyId, (newId) => {
 
 watch(userProfile, (newVal) => {
     if (newVal) {
-        fetchProperties()
+        fetchPropertiesData()
         fetchEvents()
     }
 }, { immediate: true })

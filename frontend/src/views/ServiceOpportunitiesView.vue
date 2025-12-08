@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { supabase } from '../lib/supabase'
 import { Plus, Eye, ArrowRight, ChevronDown, Check, Clock, Ban, Moon } from 'lucide-vue-next'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import ServiceOpportunityDetailModal from '../components/services/ServiceOpportunityDetailModal.vue'
@@ -41,7 +40,14 @@ const contextMenuY = ref(0)
 const contextMenuOptions = ref([])
 
 const { userProfile } = useAuth()
-const { dismissOpportunity, unsnoozeOpportunity, undismissOpportunity } = useServiceOpportunities()
+const { 
+    fetchOpportunities, 
+    fetchSnoozedCount: fetchSnoozedCountApi,
+    getWorkflowColor,
+    dismissOpportunity, 
+    unsnoozeOpportunity, 
+    undismissOpportunity 
+} = useServiceOpportunities()
 
 const fetchData = async (isBackground = false) => {
     const tenantId = userProfile.value?.tenant_id
@@ -49,66 +55,19 @@ const fetchData = async (isBackground = false) => {
     
     if (!isBackground) loading.value = true
     
-    // Auto-expire snoozes
-    await supabase.rpc('update_expired_snoozes')
-
-    // Base Query
-    let query = supabase
-        .from('service_opportunities')
-        .select(`
-            *,
-            properties (name),
-            service_templates (name)
-        `)
-        .eq('tenant_id', tenantId)
-        .is('deleted_at', null)
-    
-    // Status Filtering
-    if (statusFilter.value.length > 0) {
-        query = query.in('status', statusFilter.value)
-    } else {
-        // If nothing selected, show nothing (or could show all, but explicit is better)
-        query = query.in('status', []) 
-    }
-    // 'All' applies no extra status filter (shows everything)
-    
-    const { data: opps } = await query.order('created_at', { ascending: false })
-    
-    items.value = opps || []
-
-    // Fetch active jobs for visualization
-    if (items.value.length > 0) {
-        const ids = items.value.map(o => o.id).filter(id => !!id)
-        if (ids.length > 0) {
-            const { data: jobs } = await supabase
-                .from('jobs')
-                .select('id, service_opportunity_id, title, status')
-                .in('service_opportunity_id', ids)
-
-            // Group by Opp ID
-            const map = {}
-            if (jobs) {
-                jobs.forEach(j => {
-                    if (!map[j.service_opportunity_id]) map[j.service_opportunity_id] = []
-                    map[j.service_opportunity_id].push(j)
-                })
-            }
-            jobsMap.value = map
-        }
+    // Use composable to fetch opportunities
+    const result = await fetchOpportunities({ statusFilter: statusFilter.value })
+    if (result.success) {
+        items.value = result.opportunities
+        jobsMap.value = result.jobsMap
+        checkRouteParam()
     }
 
-    checkRouteParam()
-    checkRouteParam()
-
-    // Fetch Snoozed Count separately
-    const { count } = await supabase
-        .from('service_opportunities')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('status', 'Snoozed')
-        .is('deleted_at', null)
-    
-    snoozedCount.value = count || 0
+    // Fetch Snoozed Count
+    const countResult = await fetchSnoozedCountApi()
+    if (countResult.success) {
+        snoozedCount.value = countResult.count
+    }
 
     if (!isBackground) loading.value = false
 }
@@ -189,15 +148,6 @@ const openEdit = (item) => {
 
 const handleSaved = () => {
     fetchData()
-}
-
-const getWorkflowColor = (status) => {
-    if (status === 'Complete' || status === 'Captured') return 'bg-green-100 text-green-700'
-    if (status === 'In Progress') return 'bg-blue-100 text-blue-700'
-    if (status === 'Snoozed') return 'bg-amber-100 text-amber-800'
-    if (status === 'Dismissed') return 'bg-red-50 text-red-600'
-    if (status === 'Dismissed') return 'bg-red-50 text-red-600'
-    return 'bg-gray-100 text-gray-600'
 }
 
 // Context Menu Handler

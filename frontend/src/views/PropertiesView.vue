@@ -1,11 +1,11 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { supabase } from '../lib/supabase'
 import { Home, Calendar as CalendarIcon, Plus, Eye } from 'lucide-vue-next'
 import PropertyDetailModal from '../components/properties/PropertyDetailModal.vue'
 import PropertyFormModal from '../components/properties/PropertyFormModal.vue'
 import { useAuth } from '../composables/useAuth'
+import { useProperties } from '../composables/useProperties'
 
 const router = useRouter()
 const route = useRoute()
@@ -20,33 +20,22 @@ const selectedProperty = ref(null)
 
 // Data Fetching
 const { userProfile } = useAuth()
+const { fetchPropertiesEnriched } = useProperties()
 
 const fetchProperties = async () => {
-  // If profile is not ready, we wait. Watcher handles the trigger.
   const tenantId = userProfile.value?.tenant_id
   if (!tenantId) return
 
   loading.value = true
-  let query = supabase.from('properties_enriched').select('*')
-
-  if (tenantId) {
-      query = query.eq('tenant_id', tenantId)
-  }
   
-  if (showArchived.value) {
-    query = query.eq('status', 'archived')
-  } else {
-    query = query.eq('status', 'active')
-  }
-  
-  const { data, error } = await query.order('name')
-  
-  if (error) {
-    console.error('Error fetching properties:', error)
-  } else {
-    properties.value = data
+  const result = await fetchPropertiesEnriched({ showArchived: showArchived.value })
+  if (result.success) {
+    properties.value = result.properties
     checkRouteParam()
+  } else {
+    console.error('Error fetching properties:', result.error)
   }
+  
   loading.value = false
 }
 
@@ -94,8 +83,6 @@ const openNewProperty = () => {
 const handleSaved = () => {
   fetchProperties()
   showFormModal.value = false
-  // Optionally re-open detail if it was an edit? 
-  // No, standard UX is close form -> back to list.
 }
 </script>
 

@@ -205,6 +205,113 @@ export function useServiceOpportunities() {
         return { success: true }
     }
 
+    /**
+     * Expire any snoozes that are past their snooze_until date
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const expireSnoozes = async () => {
+        const { error } = await supabase.rpc('update_expired_snoozes')
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
+    /**
+     * Fetch service opportunities with filtering and related jobs
+     * @param {Object} options
+     * @param {Array<string>} [options.statusFilter] - Status values to include
+     * @returns {Promise<{success: boolean, opportunities?: Array, jobsMap?: Object, error?: string}>}
+     */
+    const fetchOpportunities = async ({ statusFilter = [] } = {}) => {
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) {
+            return { success: false, error: 'Tenant ID not found' }
+        }
+
+        // Auto-expire snoozes first
+        await expireSnoozes()
+
+        // Base query
+        let query = supabase
+            .from('service_opportunities')
+            .select(`
+                *,
+                properties (name),
+                service_templates (name)
+            `)
+            .eq('tenant_id', tenantId)
+            .is('deleted_at', null)
+
+        // Status filtering
+        if (statusFilter.length > 0) {
+            query = query.in('status', statusFilter)
+        }
+
+        const { data: opps, error } = await query.order('created_at', { ascending: false })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+
+        const opportunities = opps || []
+
+        // Fetch active jobs for workflow visualization
+        let jobsMap = {}
+        if (opportunities.length > 0) {
+            const ids = opportunities.map(o => o.id).filter(id => !!id)
+            if (ids.length > 0) {
+                const { data: jobs } = await supabase
+                    .from('jobs')
+                    .select('id, service_opportunity_id, title, status')
+                    .in('service_opportunity_id', ids)
+
+                if (jobs) {
+                    jobs.forEach(j => {
+                        if (!jobsMap[j.service_opportunity_id]) jobsMap[j.service_opportunity_id] = []
+                        jobsMap[j.service_opportunity_id].push(j)
+                    })
+                }
+            }
+        }
+
+        return { success: true, opportunities, jobsMap }
+    }
+
+    /**
+     * Fetch count of snoozed opportunities
+     * @returns {Promise<{success: boolean, count?: number, error?: string}>}
+     */
+    const fetchSnoozedCount = async () => {
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) {
+            return { success: false, error: 'Tenant ID not found' }
+        }
+
+        const { count, error } = await supabase
+            .from('service_opportunities')
+            .select('*', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .eq('status', 'Snoozed')
+            .is('deleted_at', null)
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true, count: count || 0 }
+    }
+
+    /**
+     * Get color classes for workflow status display
+     * @param {string} status
+     * @returns {string} Tailwind classes
+     */
+    const getWorkflowColor = (status) => {
+        if (status === 'Complete' || status === 'Captured') return 'bg-green-100 text-green-700'
+        if (status === 'In Progress') return 'bg-blue-100 text-blue-700'
+        if (status === 'Snoozed') return 'bg-amber-100 text-amber-800'
+        if (status === 'Dismissed') return 'bg-red-50 text-red-600'
+        return 'bg-gray-100 text-gray-600'
+    }
+
     return {
         saveOpportunity,
         deleteOpportunity,
@@ -212,6 +319,10 @@ export function useServiceOpportunities() {
         snoozeOpportunity,
         unsnoozeOpportunity,
         dismissOpportunity,
-        undismissOpportunity
+        undismissOpportunity,
+        expireSnoozes,
+        fetchOpportunities,
+        fetchSnoozedCount,
+        getWorkflowColor
     }
 }

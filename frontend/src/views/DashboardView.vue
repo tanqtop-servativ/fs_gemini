@@ -1,9 +1,9 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { supabase } from '../lib/supabase'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Clock, Calendar, CheckCircle2, AlertTriangle, Briefcase } from 'lucide-vue-next'
 import { useAuth } from '../composables/useAuth'
+import { useDashboard } from '../composables/useDashboard'
 
 const router = useRouter()
 const loading = ref(true)
@@ -30,54 +30,26 @@ const columnConfig = [
 ]
 
 const { userProfile } = useAuth()
+const { fetchHorizon, getTypeColor, formatTime } = useDashboard()
 
 const fetchDashboard = async () => {
     const tenantId = userProfile.value?.tenant_id
     if (!tenantId) return
 
     loading.value = true
-    const { data: jobs, error } = await supabase.rpc('get_dashboard_horizon', {
-        p_tenant_id: tenantId
-    })
-
-    if (error) {
-        console.error("Dashboard error", error)
-        loading.value = false
-        return
+    
+    const result = await fetchHorizon()
+    if (result.success) {
+        horizon.value = result.horizon
+        counts.value = result.counts
     }
-
-    // Reset
-    const buckets = { overdue: [], today: [], tomorrow: [], this_week: [], next_week: [], future: [] }
-    const cnt = { overdue: 0, today: 0, tomorrow: 0, this_week: 0, next_week: 0, future: 0 }
-
-    if (jobs) {
-        jobs.forEach(j => {
-            if (buckets[j.bucket]) {
-                buckets[j.bucket].push(j)
-                cnt[j.bucket]++
-            }
-        })
-    }
-
-    horizon.value = buckets
-    counts.value = cnt
+    
     loading.value = false
 }
 
 watch(userProfile, (newVal) => {
     if (newVal?.tenant_id) fetchDashboard()
 }, { immediate: true })
-
-const getTypeColor = (type) => {
-    if (type === 'Cleaning') return 'bg-blue-100 text-blue-700'
-    if (type === 'Inspection') return 'bg-purple-100 text-purple-700'
-    if (type === 'Kitting') return 'bg-yellow-100 text-yellow-700'
-    return 'bg-gray-100 text-gray-600'
-}
-
-const formatTime = (iso) => {
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 </script>
 
 <template>

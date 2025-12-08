@@ -118,9 +118,39 @@ export function useProperties() {
         return { success: true, properties: data }
     }
 
+    /**
+     * Fetch enriched properties from the properties_enriched view
+     * @param {Object} options
+     * @param {boolean} [options.showArchived] - Whether to show archived properties
+     * @returns {Promise<{success: boolean, properties?: Array, error?: string}>}
+     */
+    const fetchPropertiesEnriched = async ({ showArchived = false } = {}) => {
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) {
+            return { success: false, error: 'Tenant ID not found' }
+        }
+
+        let query = supabase.from('properties_enriched').select('*')
+            .eq('tenant_id', tenantId)
+
+        if (showArchived) {
+            query = query.eq('status', 'archived')
+        } else {
+            query = query.eq('status', 'active')
+        }
+
+        const { data, error } = await query.order('name')
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true, properties: data || [] }
+    }
+
     return {
         saveProperty,
         deleteProperty,
-        listProperties
+        listProperties,
+        fetchPropertiesEnriched
     }
 }
