@@ -146,8 +146,17 @@ const openEdit = (item) => {
     showForm.value = true
 }
 
-const handleSaved = () => {
-    fetchData()
+const handleSaved = async (payload) => {
+    await fetchData()
+    
+    // If this was a new opportunity, open the detail modal
+    if (payload?.isNew && payload?.id) {
+        // Find the newly created item
+        const newItem = items.value.find(i => i.id === payload.id)
+        if (newItem) {
+            openDetail(newItem)
+        }
+    }
 }
 
 // Context Menu Handler

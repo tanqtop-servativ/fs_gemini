@@ -93,7 +93,11 @@ const handleSave = async () => {
 
         if (!result.success) throw new Error(result.error)
 
-        emit('saved')
+        // Emit the saved opportunity data (includes id for new records)
+        emit('saved', { 
+            id: result.data?.id || props.opportunity?.id,
+            isNew: !props.opportunity 
+        })
         emit('close')
 
     } catch (e) {
