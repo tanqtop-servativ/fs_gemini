@@ -295,7 +295,7 @@ const statusColor = (s) => {
                      <div class="space-y-4">
                          <div v-for="(job, j_idx) in jobs" :key="job.id" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                              <div class="flex items-center gap-2 mb-3">
-                                 <span class="text-xs font-bold text-gray-500 uppercase w-12 text-right">Step {{ j_idx + 1 }}</span>
+                                 <span class="text-xs font-bold text-gray-500 uppercase w-12 text-right">Job {{ j_idx + 1 }}</span>
                                  <div 
                                     class="flex-1 bg-white p-2 rounded border border-gray-200 flex items-center justify-between cursor-pointer hover:border-blue-300 transition"
                                     @click="router.push(`/jobs/${job.id}`)"
