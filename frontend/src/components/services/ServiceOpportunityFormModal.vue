@@ -98,7 +98,7 @@ const handleSave = async () => {
 
         if (!result.success) throw new Error(result.error)
 
-        const savedId = result.data?.id || props.opportunity?.id
+        const savedId = result.opportunityId || props.opportunity?.id
 
         // Auto-generate workflow if template is assigned (new or changed)
         if (hasTemplate && (isNew || !hadTemplate)) {
