@@ -16,7 +16,13 @@ DECLARE
 BEGIN
     -- Get job with property info
     SELECT 
-        j.*,
+        j.id,
+        j.title,
+        j.description,
+        j.status,
+        j.priority,
+        j.readable_id,
+        j.created_at,
         p.id as property_id,
         p.name as property_name,
         p.address as property_address,
@@ -39,7 +45,7 @@ BEGIN
         'title', job_record.title,
         'description', job_record.description,
         'status', job_record.status,
-        'job_template_id', job_record.job_template_id,
+        'priority', job_record.priority,
         'readable_id', job_record.readable_id,
         'created_at', job_record.created_at,
         'property', jsonb_build_object(
@@ -61,10 +67,8 @@ BEGIN
                 jsonb_build_object(
                     'id', t.id,
                     'title', t.title,
-                    'description', t.description,
-                    'is_completed', t.is_completed,
-                    'sort_order', t.sort_order
-                ) ORDER BY t.sort_order, t.id
+                    'is_completed', t.is_completed
+                ) ORDER BY t.id
             ), '[]'::jsonb)
             FROM job_tasks t WHERE t.job_id = p_job_id
         ),
