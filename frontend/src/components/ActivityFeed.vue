@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { Bell, FileText, Mail, MessageSquare, AlertCircle, RefreshCw, Plus, ChevronDown, ChevronUp, Copy, Check } from 'lucide-vue-next'
 import { useAuth } from '../composables/useAuth'
+import { perfLog } from '../lib/perfLog'
 
 const props = defineProps({
   limit: { type: Number, default: 50 },
@@ -41,11 +42,17 @@ watch(userProfile, (newVal) => {
 }, { immediate: true })
 
 onMounted(() => {
+    perfLog.mount('ActivityFeed')
     autoRefresh.value = setInterval(fetchFeed, 30000)
+    perfLog.startInterval(autoRefresh.value, 'ActivityFeed', 30000)
 })
 
 onUnmounted(() => {
-    if (autoRefresh.value) clearInterval(autoRefresh.value)
+    perfLog.unmount('ActivityFeed')
+    if (autoRefresh.value) {
+        perfLog.stopInterval(autoRefresh.value, 'ActivityFeed')
+        clearInterval(autoRefresh.value)
+    }
 })
 
 const formatTime = (ts) => {

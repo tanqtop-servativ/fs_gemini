@@ -14,6 +14,7 @@ import { useAuth } from '../composables/useAuth'
 import { useCalendar } from '../composables/useCalendar'
 import CalendarEventModal from '../components/calendar/CalendarEventModal.vue'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
+import { perfLog } from '../lib/perfLog'
 
 // Refs for UI state
 const route = useRoute()
@@ -45,9 +46,13 @@ const closeContextMenu = () => {
 
 // Close context menu on click outside
 onMounted(() => {
+  perfLog.mount('CalendarView')
+  perfLog.addListener('CalendarView', 'click')
   document.addEventListener('click', closeContextMenu)
 })
 onUnmounted(() => {
+  perfLog.unmount('CalendarView')
+  perfLog.removeListener('CalendarView', 'click')
   document.removeEventListener('click', closeContextMenu)
 })
 

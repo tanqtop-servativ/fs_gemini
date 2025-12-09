@@ -10,6 +10,7 @@ import TableSearch from '../components/TableSearch.vue'
 import { useAuth } from '../composables/useAuth'
 import { useServiceOpportunities } from '../composables/useServiceOpportunities'
 import { useTableControls } from '../composables/useTableControls'
+import { perfLog } from '../lib/perfLog'
 
 const router = useRouter()
 const route = useRoute()
@@ -130,15 +131,23 @@ const handleGlobalClick = (e) => {
 }
 
 onMounted(() => {
+    perfLog.mount('ServiceOpportunitiesView')
+    perfLog.addListener('ServiceOpportunitiesView', 'click')
     document.addEventListener('click', handleGlobalClick)
 
     // Setup Polling
     autoRefresh.value = setInterval(() => fetchData(true), 30000)
+    perfLog.startInterval(autoRefresh.value, 'ServiceOpportunitiesView', 30000)
 })
 
 onUnmounted(() => {
+    perfLog.unmount('ServiceOpportunitiesView')
+    perfLog.removeListener('ServiceOpportunitiesView', 'click')
     document.removeEventListener('click', handleGlobalClick)
-    if (autoRefresh.value) clearInterval(autoRefresh.value)
+    if (autoRefresh.value) {
+        perfLog.stopInterval(autoRefresh.value, 'ServiceOpportunitiesView')
+        clearInterval(autoRefresh.value)
+    }
 })
 
 // Actions
