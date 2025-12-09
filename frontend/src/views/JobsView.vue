@@ -1,12 +1,15 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Eye, ChevronDown, Check, Briefcase } from 'lucide-vue-next'
+import { Eye, ChevronDown, Check, Briefcase, Calendar, UserPlus, X, Trash2 } from 'lucide-vue-next'
 import { useAuth } from '../composables/useAuth'
 import { useJobs } from '../composables/useJobs'
 import { useTableControls } from '../composables/useTableControls'
+import { useVisits } from '../composables/useVisits'
+import { supabase } from '../lib/supabase'
 import SortableHeader from '../components/SortableHeader.vue'
 import TableSearch from '../components/TableSearch.vue'
+import ContextMenu from '../components/ContextMenu.vue'
 
 const router = useRouter()
 
@@ -20,6 +23,22 @@ const allStatuses = ['Pending', 'In Progress', 'Complete', 'Cancelled']
 
 const { userProfile } = useAuth()
 const { fetchJobs, getStatusColor } = useJobs()
+const { createVisit } = useVisits()
+
+// Context Menu State
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextJob = ref(null)
+
+// Scheduling Modal
+const showRescheduleModal = ref(false)
+const rescheduleDate = ref('')
+
+// Crew Assignment Modal
+const showAssignModal = ref(false)
+const availableWorkers = ref([])
+const selectedWorker = ref('')
 
 // Table controls
 const { 
@@ -76,6 +95,146 @@ onUnmounted(() => {
 
 const goToJob = (job) => {
     router.push(`/jobs/${job.id}`)
+}
+
+// Context Menu
+const openContextMenu = (e, job) => {
+    e.preventDefault()
+    contextJob.value = job
+    contextMenuX.value = e.clientX
+    contextMenuY.value = e.clientY
+    showContextMenu.value = true
+}
+
+const getContextMenuOptions = () => {
+    const job = contextJob.value
+    if (!job) return []
+    
+    return [
+        {
+            label: 'Reschedule',
+            icon: Calendar,
+            action: () => openReschedule()
+        },
+        {
+            label: 'Unschedule',
+            icon: X,
+            action: () => unscheduleJob()
+        },
+        {
+            label: 'Assign Crew',
+            icon: UserPlus,
+            action: () => openAssignModal()
+        },
+        {
+            label: 'Delete',
+            icon: Trash2,
+            class: 'text-red-600 hover:bg-red-50',
+            action: () => softDeleteJob()
+        }
+    ]
+}
+
+// Reschedule
+const openReschedule = () => {
+    showContextMenu.value = false
+    // Default to tomorrow 9am
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(9, 0, 0, 0)
+    const offset = d.getTimezoneOffset() * 60000
+    const localDate = new Date(d.getTime() - offset)
+    rescheduleDate.value = localDate.toISOString().slice(0, 16)
+    showRescheduleModal.value = true
+}
+
+const confirmReschedule = async () => {
+    if (!rescheduleDate.value || !contextJob.value) return
+    
+    const result = await createVisit(contextJob.value.id, new Date(rescheduleDate.value).toISOString())
+    
+    if (!result.success) {
+        alert('Error scheduling: ' + result.error)
+    } else {
+        showRescheduleModal.value = false
+        rescheduleDate.value = ''
+        await fetchData()
+    }
+}
+
+// Unschedule
+const unscheduleJob = async () => {
+    showContextMenu.value = false
+    if (!contextJob.value) return
+    if (!confirm('Remove scheduling for this job? This will cancel all pending visits.')) return
+    
+    // Cancel all pending visits for this job
+    const { error } = await supabase
+        .from('visits')
+        .update({ status: 'Cancelled' })
+        .eq('job_id', contextJob.value.id)
+        .in('status', ['Scheduled', 'Pending'])
+    
+    if (error) {
+        alert('Error unscheduling: ' + error.message)
+    } else {
+        await fetchData()
+    }
+}
+
+// Assign Crew
+const openAssignModal = async () => {
+    showContextMenu.value = false
+    
+    // Fetch available workers
+    const tenantId = userProfile.value?.tenant_id
+    const { data } = await supabase
+        .from('people')
+        .select('id, first_name, last_name')
+        .eq('tenant_id', tenantId)
+        .order('first_name')
+    
+    availableWorkers.value = data || []
+    selectedWorker.value = ''
+    showAssignModal.value = true
+}
+
+const confirmAssignment = async () => {
+    if (!selectedWorker.value || !contextJob.value) return
+    
+    // Create job assignment
+    const { error } = await supabase
+        .from('job_assignments')
+        .insert({
+            job_id: contextJob.value.id,
+            person_id: selectedWorker.value
+        })
+    
+    if (error) {
+        alert('Error assigning: ' + error.message)
+    } else {
+        showAssignModal.value = false
+        selectedWorker.value = ''
+        await fetchData()
+    }
+}
+
+// Soft Delete
+const softDeleteJob = async () => {
+    showContextMenu.value = false
+    if (!contextJob.value) return
+    if (!confirm(`Delete job "${contextJob.value.title}"? This can be undone.`)) return
+    
+    const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'Cancelled', deleted_at: new Date().toISOString() })
+        .eq('id', contextJob.value.id)
+    
+    if (error) {
+        alert('Error deleting: ' + error.message)
+    } else {
+        await fetchData()
+    }
 }
 </script>
 
@@ -162,6 +321,7 @@ const goToJob = (job) => {
            <tr v-for="item in processedItems" :key="item.id" 
                 class="group hover:bg-slate-50 transition-colors cursor-pointer" 
                 @click="goToJob(item)"
+                @contextmenu="openContextMenu($event, item)"
             >
              <!-- Job Title -->
              <td class="px-6 py-4">
@@ -197,6 +357,66 @@ const goToJob = (job) => {
         </tbody>
       </table>
     </div>
+
+    <!-- Context Menu -->
+    <ContextMenu 
+        v-model="showContextMenu" 
+        :x="contextMenuX" 
+        :y="contextMenuY" 
+        :options="getContextMenuOptions()"
+    />
+
+    <!-- Reschedule Modal -->
+    <Teleport to="body">
+      <div v-if="showRescheduleModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[200]" @click.self="showRescheduleModal = false">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95">
+          <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <Calendar size="20" class="text-blue-500" />
+            Schedule Job
+          </h3>
+          <div class="mb-4">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date & Time</label>
+            <input 
+              type="datetime-local" 
+              v-model="rescheduleDate"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div class="flex justify-end gap-2">
+            <button @click="showRescheduleModal = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+            <button @click="confirmReschedule" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Schedule</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Assign Crew Modal -->
+    <Teleport to="body">
+      <div v-if="showAssignModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[200]" @click.self="showAssignModal = false">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95">
+          <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <UserPlus size="20" class="text-blue-500" />
+            Assign Crew
+          </h3>
+          <div class="mb-4">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Select Worker</label>
+            <select 
+              v-model="selectedWorker"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select a worker...</option>
+              <option v-for="w in availableWorkers" :key="w.id" :value="w.id">
+                {{ w.first_name }} {{ w.last_name }}
+              </option>
+            </select>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button @click="showAssignModal = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+            <button @click="confirmAssignment" :disabled="!selectedWorker" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">Assign</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
   </div>
 </template>
