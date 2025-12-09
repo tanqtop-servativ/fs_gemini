@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, reactive, computed } from 'vue'
 import AuditHistory from '../AuditHistory.vue'
-import { supabase } from '../../lib/supabase'
+import { useTenants } from '../../composables/useTenants'
 import { X, Pencil, Trash2, Plus, ArrowRight } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -10,6 +10,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+
+const { getTenantUsers, updateTenant, deleteTenant, manageTenantUser } = useTenants()
 
 const admins = ref([])
 const loadingAdmins = ref(false)
@@ -32,33 +34,30 @@ watch(() => props.isOpen, (open) => {
 
 const fetchAdmins = async () => {
     loadingAdmins.value = true
-    const { data } = await supabase.rpc('get_tenant_users', { p_tenant_id: props.tenant.id })
-    admins.value = data || []
+    const result = await getTenantUsers(props.tenant.id)
+    admins.value = result.success ? result.users : []
     loadingAdmins.value = false
 }
 
-const updateName = async () => {
+const handleUpdateName = async () => {
     if (!form.name) return
-    const { error } = await supabase.rpc('update_tenant', {
-        p_tenant_id: props.tenant.id,
-        p_name: form.name
-    })
-    if (error) alert(error.message)
-    else {
+    const result = await updateTenant(props.tenant.id, form.name)
+    if (!result.success) {
+        alert(result.error)
+    } else {
         alert("Updated!")
-        emit('saved') // Should refresh parent list, but we keep modal open
+        emit('saved')
     }
 }
 
-const deleteTenant = async () => {
+const handleDeleteTenant = async () => {
     const check = prompt("Type DELETE to confirm archiving this tenant:")
     if (check !== 'DELETE') return
 
-    const { error } = await supabase.rpc('delete_tenant', {
-        p_tenant_id: props.tenant.id
-    })
-    if (error) alert(error.message)
-    else {
+    const result = await deleteTenant(props.tenant.id)
+    if (!result.success) {
+        alert(result.error)
+    } else {
         alert("Tenant Archived")
         emit('saved')
         emit('close')
@@ -84,19 +83,20 @@ const openAdminForm = (u = null) => {
 }
 
 const saveAdmin = async () => {
-    const op = adminForm.id ? 'UPDATE' : 'CREATE'
-    const { error } = await supabase.rpc('manage_tenant_user', {
-        p_operation: op,
-        p_tenant_id: props.tenant.id,
-        p_user_id: adminForm.id || null,
-        p_email: adminForm.email,
-        p_password: adminForm.password || null,
-        p_first: adminForm.first,
-        p_last: adminForm.last
+    const operation = adminForm.id ? 'UPDATE' : 'CREATE'
+    const result = await manageTenantUser({
+        operation,
+        tenantId: props.tenant.id,
+        userId: adminForm.id || null,
+        email: adminForm.email,
+        password: adminForm.password || null,
+        firstName: adminForm.first,
+        lastName: adminForm.last
     })
 
-    if (error) alert(error.message)
-    else {
+    if (!result.success) {
+        alert(result.error)
+    } else {
         showAdminForm.value = false
         fetchAdmins()
     }
@@ -104,13 +104,16 @@ const saveAdmin = async () => {
 
 const deleteAdmin = async (uid) => {
     if (!confirm("Remove this admin user?")) return
-    const { error } = await supabase.rpc('manage_tenant_user', {
-        p_operation: 'DELETE',
-        p_tenant_id: props.tenant.id,
-        p_user_id: uid
+    const result = await manageTenantUser({
+        operation: 'DELETE',
+        tenantId: props.tenant.id,
+        userId: uid
     })
-    if (error) alert(error.message)
-    else fetchAdmins()
+    if (!result.success) {
+        alert(result.error)
+    } else {
+        fetchAdmins()
+    }
 }
 </script>
 
@@ -141,7 +144,7 @@ const deleteAdmin = async (uid) => {
                          <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Name</label>
                          <input v-model="form.name" class="w-full p-2 border rounded">
                      </div>
-                     <button @click="updateName" class="px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded">Update</button>
+                     <button @click="handleUpdateName" class="px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded">Update</button>
                  </div>
                  <div v-else class="grid grid-cols-2 gap-4">
                      <div>
@@ -215,7 +218,7 @@ const deleteAdmin = async (uid) => {
                          <div class="font-bold text-red-900 text-sm">Delete Tenant</div>
                          <div class="text-red-600 text-xs">Archive this tenant (Soft Delete).</div>
                      </div>
-                     <button @click="deleteTenant" class="px-4 py-2 bg-white border border-red-200 text-red-600 text-sm font-bold rounded hover:bg-red-600 hover:text-white transition-colors">
+                     <button @click="handleDeleteTenant" class="px-4 py-2 bg-white border border-red-200 text-red-600 text-sm font-bold rounded hover:bg-red-600 hover:text-white transition-colors">
                          Delete Tenant
                      </button>
                  </div>

@@ -1,6 +1,6 @@
 <script setup>
-import { ref, reactive } from 'vue'
-import { supabase } from '../../lib/supabase'
+import { ref, reactive, watch } from 'vue'
+import { useTenants } from '../../composables/useTenants'
 import { X, Check } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -8,6 +8,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+
+const { createTenantWithAdmin } = useTenants()
 
 const saving = ref(false)
 const form = reactive({
@@ -33,49 +35,27 @@ const handleSave = async () => {
 
     saving.value = true
 
-    try {
-        // 1. Create Auth User via Python API (Service Role)
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-        const apiResponse = await fetch(`${apiUrl}/create-user`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: form.email,
-                password: form.password,
-                invite: false
-            })
-        })
+    const result = await createTenantWithAdmin({
+        tenantName: form.name,
+        firstName: form.first,
+        lastName: form.last,
+        email: form.email,
+        password: form.password
+    })
 
-        if (!apiResponse.ok) {
-            const errText = await apiResponse.text()
-            throw new Error("Failed to create user: " + errText)
-        }
+    saving.value = false
 
-        const apiData = await apiResponse.json()
-        const userId = apiData.user.id
-
-        // 2. Create Tenant & Link User via RPC
-        const { error } = await supabase.rpc('create_tenant_for_user', {
-             p_tenant_name: form.name,
-             p_user_id: userId,
-             p_first_name: form.first,
-             p_last_name: form.last,
-             p_email: form.email
-        })
-
-        if (error) throw error
-
-        alert("Tenant created successfully!")
-        emit('saved')
-        emit('close')
-        resetForm()
-
-    } catch (e) {
-        alert("Error: " + e.message)
-    } finally {
-        saving.value = false
+    if (!result.success) {
+        alert("Error: " + result.error)
+        return
     }
+
+    alert("Tenant created successfully!")
+    emit('saved')
+    emit('close')
+    resetForm()
 }
+
 // Unsaved Config
 const initialState = ref('')
 const getSnapshot = () => JSON.stringify(form)
@@ -87,8 +67,6 @@ const handleClose = () => {
     emit('close')
 }
 
-// Watch Open
-import { watch } from 'vue'
 watch(() => props.isOpen, (open) => {
     if (open) {
         resetForm()
