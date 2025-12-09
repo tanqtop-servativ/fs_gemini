@@ -54,7 +54,8 @@ const getCode = (type) => codes.value.find(c => c.code_type === type)?.code_valu
 
 const displayAddress = computed(() => {
     if (!props.property?.display_address) return ''
-    return props.property.display_address
+    // Trim trailing commas/spaces from legacy bug
+    return props.property.display_address.replace(/[,\s]+$/, '')
 })
 
 const mapLink = computed(() => `https://maps.google.com/?q=${encodeURIComponent(displayAddress.value)}`)

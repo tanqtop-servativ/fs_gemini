@@ -233,7 +233,7 @@ const handleServiceOppSaved = () => {
             
             <!-- Address -->
             <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-              {{ prop.display_address }}
+              {{ (prop.display_address || '').replace(/[,\s]+$/, '') }}
             </td>
             
             <!-- Assignments -->
