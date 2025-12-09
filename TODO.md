@@ -27,3 +27,13 @@ Update `sync_runner.py` to inspect the iCal event description/summary.
 -   **Inventory Integration:** Deduct inventory when Kitting is complete.
 -   **Mobile View:** Specialized view for field staff to see instructions and update status.
 -   **Notifications:** Alert staff when jobs are assigned or unblocked.
+
+## 3. Fix Address Comma Accumulation (Database)
+**Priority:** Low (band-aid in place)
+**Status:** Pending migration
+
+**The Problem:** The `properties_enriched` view concatenates `address || ', ' || city || zip`, causing trailing commas when city/zip are null. Each edit/save cycle accumulates more commas.
+
+**Current Band-Aid:** Frontend trims trailing commas on display (all views) and on form load.
+
+**The Proper Fix:** Apply migration `migrations/fix_properties_enriched_address.sql` to use raw `p.address AS display_address` without concatenation. Then clean up existing corrupted addresses in the database.
