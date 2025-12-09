@@ -28,7 +28,7 @@ const fetchJob = async () => {
         .from('jobs')
         .select(`
             *,
-            properties:property_id(id, name, address, latitude, longitude),
+            properties:property_id(id, name, address),
             service_opportunities:service_opportunity_id(id, title, service_template_id)
         `)
         .eq('id', jobId.value)
