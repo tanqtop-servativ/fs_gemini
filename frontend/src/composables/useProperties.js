@@ -9,6 +9,24 @@ export function useProperties() {
     const { userProfile, effectiveTenantId } = useAuth()
 
     /**
+     * Get property detail via RPC (with codes, feeds, inventory, photos, people)
+     * @param {string} propertyId
+     * @returns {Promise<{success: boolean, property?: Object, error?: string}>}
+     */
+    const getPropertyDetail = async (propertyId) => {
+        const { data, error } = await supabase.rpc('get_property_detail', { p_property_id: propertyId })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        if (data?.error) {
+            return { success: false, error: data.error }
+        }
+        return { success: true, property: data }
+    }
+
+
+    /**
      * Save (create or update) a property using existing RPCs
      * @param {Object} options - Property data matching RPC parameters
      * @param {string} [options.id] - Property ID (for updates)
@@ -148,6 +166,7 @@ export function useProperties() {
     }
 
     return {
+        getPropertyDetail,
         saveProperty,
         deleteProperty,
         listProperties,

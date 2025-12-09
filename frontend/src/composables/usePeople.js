@@ -1,6 +1,6 @@
 /**
  * usePeople composable
- * Centralizes person/user management logic
+ * Centralizes person/user management - ALL business logic via database RPCs
  */
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
@@ -9,6 +9,41 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 export function usePeople() {
     const { effectiveTenantId } = useAuth()
+
+    /**
+     * List all people for tenant via RPC
+     * @returns {Promise<{success: boolean, people?: Array, error?: string}>}
+     */
+    const listPeople = async () => {
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) {
+            return { success: false, error: 'Tenant ID not found' }
+        }
+
+        const { data, error } = await supabase.rpc('list_people', { p_tenant_id: tenantId })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true, people: data || [] }
+    }
+
+    /**
+     * Get person detail via RPC
+     * @param {string} personId
+     * @returns {Promise<{success: boolean, person?: Object, error?: string}>}
+     */
+    const getPersonDetail = async (personId) => {
+        const { data, error } = await supabase.rpc('get_person_detail', { p_person_id: personId })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        if (data?.error) {
+            return { success: false, error: data.error }
+        }
+        return { success: true, person: data }
+    }
 
     /**
      * Create a Supabase Auth user (via API server)
@@ -39,113 +74,97 @@ export function usePeople() {
     }
 
     /**
-     * Create a new person (and optionally link to auth user)
+     * Create a new person via RPC
      * @param {Object} person
      * @param {string} person.first_name
      * @param {string} person.last_name
-     * @param {string} person.email
+     * @param {string} [person.email]
      * @param {string} [person.phone]
-     * @param {string} [person.userId] - Optional auth user ID to link
-     * @returns {Promise<{success: boolean, personId?: string, error?: string}>}
+     * @param {string[]} [person.role_ids] - Array of role UUIDs
+     * @returns {Promise<{success: boolean, person_id?: string, error?: string}>}
      */
-    const createPerson = async ({ first_name, last_name, email, phone = null, userId = null }) => {
+    const createPerson = async ({ first_name, last_name, email = null, phone = null, role_ids = [] }) => {
         const tenantId = effectiveTenantId.value
         if (!tenantId) {
             return { success: false, error: 'Tenant ID not found' }
         }
 
-        const { data, error } = await supabase.rpc('create_full_person', {
+        const { data, error } = await supabase.rpc('create_person', {
+            p_tenant_id: tenantId,
             p_first_name: first_name,
             p_last_name: last_name,
             p_email: email,
             p_phone: phone,
-            p_tenant_id: tenantId,
-            p_user_id: userId
-        })
-
-        if (error) {
-            return { success: false, error: error.message }
-        }
-
-        if (data && !data.success) {
-            return { success: false, error: data.error }
-        }
-
-        return { success: true, personId: data.person_id }
-    }
-
-    /**
-     * Update an existing person
-     * @param {Object} person
-     * @param {string} person.id - Person ID
-     * @param {string} person.first_name
-     * @param {string} person.last_name
-     * @param {string} person.email
-     * @param {string[]} [person.role_ids] - Array of role UUIDs
-     * @returns {Promise<{success: boolean, error?: string}>}
-     */
-    const updatePerson = async ({ id, first_name, last_name, email, role_ids = [] }) => {
-        const tenantId = effectiveTenantId.value
-        if (!tenantId) {
-            return { success: false, error: 'Tenant ID not found' }
-        }
-
-        const { error } = await supabase.rpc('save_person_safe', {
-            p_id: id,
-            p_tenant_id: tenantId,
-            p_first: first_name,
-            p_last: last_name,
-            p_email: email,
             p_role_ids: role_ids
         })
 
         if (error) {
             return { success: false, error: error.message }
         }
-
-        return { success: true }
+        return data
     }
 
     /**
-     * Assign roles to a person
-     * @param {Object} options
-     * @param {string} options.personId
-     * @param {string[]} options.roleIds
-     * @param {Object} options.personData - Required person data for save_person_safe
+     * Update an existing person via RPC
+     * @param {Object} person
+     * @param {string} person.id - Person ID
+     * @param {string} person.first_name
+     * @param {string} person.last_name
+     * @param {string} [person.email]
+     * @param {string} [person.phone]
+     * @param {string[]} [person.role_ids] - Array of role UUIDs
      * @returns {Promise<{success: boolean, error?: string}>}
      */
-    const assignRoles = async ({ personId, roleIds, personData }) => {
-        return updatePerson({
-            id: personId,
-            first_name: personData.first_name,
-            last_name: personData.last_name,
-            email: personData.email,
-            role_ids: roleIds
+    const updatePerson = async ({ id, first_name, last_name, email = null, phone = null, role_ids = [] }) => {
+        const { data, error } = await supabase.rpc('update_person', {
+            p_person_id: id,
+            p_first_name: first_name,
+            p_last_name: last_name,
+            p_email: email,
+            p_phone: phone,
+            p_role_ids: role_ids
         })
-    }
-
-    /**
-     * Archive (soft delete) a person
-     * @param {string} personId
-     * @returns {Promise<{success: boolean, error?: string}>}
-     */
-    const archivePerson = async (personId) => {
-        const { error } = await supabase
-            .from('people')
-            .update({ deleted_at: new Date().toISOString() })
-            .eq('id', personId)
 
         if (error) {
             return { success: false, error: error.message }
         }
-        return { success: true }
+        return data
+    }
+
+    /**
+     * Delete a person via RPC
+     * @param {string} personId
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const deletePerson = async (personId) => {
+        const { data, error } = await supabase.rpc('delete_person', { p_person_id: personId })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return data
+    }
+
+    /**
+     * List all roles via RPC
+     * @returns {Promise<{success: boolean, roles?: Array, error?: string}>}
+     */
+    const listRoles = async () => {
+        const { data, error } = await supabase.rpc('list_roles')
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true, roles: data || [] }
     }
 
     return {
+        listPeople,
+        getPersonDetail,
         createUserLogin,
         createPerson,
         updatePerson,
-        assignRoles,
-        archivePerson
+        deletePerson,
+        listRoles
     }
 }
