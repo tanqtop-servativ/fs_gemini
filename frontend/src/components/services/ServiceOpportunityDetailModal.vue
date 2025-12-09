@@ -1,10 +1,10 @@
-```vue
 <script setup>
 import { ref, watch, onMounted, computed, nextTick } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useServiceOpportunities } from '../../composables/useServiceOpportunities'
+import { useVisits } from '../../composables/useVisits'
 import AuditHistory from '../AuditHistory.vue'
-import { X, Play, AlertTriangle, CheckCircle2, Circle, ArrowRight, Pencil, CheckSquare, Square, Zap, Ban, Clock, Check } from 'lucide-vue-next'
+import { X, Play, AlertTriangle, CheckCircle2, Circle, ArrowRight, Pencil, CheckSquare, Square, Zap, Ban, Clock, Check, Calendar } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -15,6 +15,7 @@ const props = defineProps({
 })
 
 const { snoozeOpportunity, unsnoozeOpportunity, dismissOpportunity, undismissOpportunity } = useServiceOpportunities()
+const { createVisit } = useVisits()
 
 const snoozeInput = ref(null)
 
@@ -36,13 +37,69 @@ const fetchJobs = async () => {
         .from('jobs')
         .select(`
             *,
-            job_tasks (id, title, is_completed)
+            job_tasks (id, title, is_completed),
+            visits (id, scheduled_start, status)
         `)
         .eq('service_opportunity_id', props.opportunity.id)
         .order('id', { ascending: true })
 
     jobs.value = data || []
     loadingJobs.value = false
+}
+
+// Scheduling state
+const schedulingJobId = ref(null)
+const scheduleDate = ref('')
+
+const startScheduling = (jobId) => {
+    schedulingJobId.value = jobId
+    // Default to tomorrow 9am
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(9, 0, 0, 0)
+    const offset = d.getTimezoneOffset() * 60000
+    const localDate = new Date(d.getTime() - offset)
+    scheduleDate.value = localDate.toISOString().slice(0, 16)
+}
+
+const cancelScheduling = () => {
+    schedulingJobId.value = null
+    scheduleDate.value = ''
+}
+
+const confirmSchedule = async (jobId) => {
+    if (!scheduleDate.value) {
+        alert('Please select a date and time')
+        return
+    }
+    
+    const result = await createVisit(jobId, new Date(scheduleDate.value).toISOString())
+    
+    if (!result.success) {
+        alert('Error scheduling: ' + result.error)
+    } else {
+        schedulingJobId.value = null
+        scheduleDate.value = ''
+        await fetchJobs() // Refresh to show new schedule
+    }
+}
+
+const getJobSchedule = (job) => {
+    if (!job.visits || job.visits.length === 0) return null
+    // Get the first scheduled visit
+    const scheduled = job.visits.find(v => v.scheduled_start)
+    return scheduled?.scheduled_start
+}
+
+const formatSchedule = (isoDate) => {
+    if (!isoDate) return ''
+    return new Date(isoDate).toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    })
 }
 
 watch(() => props.isOpen, (open) => {
@@ -311,8 +368,37 @@ const statusColor = (s) => {
                                  </div>
                              </div>
 
+                             <!-- Schedule Section -->
+                             <div class="mb-3 pl-14">
+                                 <div v-if="getJobSchedule(job)" class="flex items-center gap-2 text-xs text-slate-600 bg-blue-50 rounded px-3 py-2 border border-blue-100">
+                                     <Calendar size="14" class="text-blue-500" />
+                                     <span class="font-medium">{{ formatSchedule(getJobSchedule(job)) }}</span>
+                                 </div>
+                                 <div v-else-if="schedulingJobId === job.id" class="flex items-center gap-2 animate-in slide-in-from-top-1">
+                                     <input 
+                                         type="datetime-local" 
+                                         v-model="scheduleDate"
+                                         class="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
+                                     />
+                                     <button @click="confirmSchedule(job.id)" class="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                                         <Check size="14" />
+                                     </button>
+                                     <button @click="cancelScheduling" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition">
+                                         <X size="14" />
+                                     </button>
+                                 </div>
+                                 <button 
+                                     v-else
+                                     @click.stop="startScheduling(job.id)"
+                                     class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded transition"
+                                 >
+                                     <Calendar size="12" />
+                                     Schedule
+                                 </button>
+                             </div>
+
                              <!-- Tasks -->
-                             <div v-if="job.job_tasks && job.job_tasks.length" class="pl-3 border-l-2 border-slate-100 space-y-1 mb-3">
+                             <div v-if="job.job_tasks && job.job_tasks.length" class="pl-3 border-l-2 border-slate-100 space-y-1 mb-3 ml-11">
                                  <div v-for="t in job.job_tasks" :key="t.id" class="flex items-center gap-2 text-xs text-gray-600">
                                      <CheckSquare v-if="t.is_completed" class="w-3 h-3 text-green-500" />
                                      <Square v-else class="w-3 h-3 text-gray-300" />
@@ -321,7 +407,7 @@ const statusColor = (s) => {
                              </div>
 
                              <!-- Inputs (Read Only) -->
-                             <div v-if="job.job_inputs && job.job_inputs.length" class="mt-2 pt-2 border-t border-gray-50 grid grid-cols-2 gap-2">
+                             <div v-if="job.job_inputs && job.job_inputs.length" class="mt-2 pt-2 border-t border-gray-50 grid grid-cols-2 gap-2 ml-11">
                                  <div v-for="inp in job.job_inputs" :key="inp.id">
                                      <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">
                                          {{ inp.job_template_inputs?.label || 'Input' }}
