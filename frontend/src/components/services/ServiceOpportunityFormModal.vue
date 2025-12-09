@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, reactive, onMounted } from 'vue'
+import { supabase } from '../../lib/supabase'
 import { useServiceOpportunities } from '../../composables/useServiceOpportunities'
 import { X, Save, Calendar, Building, FileText, Smartphone } from 'lucide-vue-next'
 
@@ -82,6 +83,10 @@ const handleSave = async () => {
         const tpl = serviceTemplates.value.find(t => t.id === form.service_template_id)
         if (tpl) title = tpl.name
 
+        const isNew = !props.opportunity
+        const hadTemplate = props.opportunity?.service_template_id
+        const hasTemplate = form.service_template_id
+
         const result = await saveOpportunity({
             id: props.opportunity?.id,
             property_id: form.property_id,
@@ -93,10 +98,22 @@ const handleSave = async () => {
 
         if (!result.success) throw new Error(result.error)
 
+        const savedId = result.data?.id || props.opportunity?.id
+
+        // Auto-generate workflow if template is assigned (new or changed)
+        if (hasTemplate && (isNew || !hadTemplate)) {
+            const { error: genError } = await supabase.rpc('generate_service_workflow', {
+                p_service_opportunity_id: savedId
+            })
+            if (genError) {
+                console.warn('Auto-generate workflow failed:', genError.message)
+            }
+        }
+
         // Emit the saved opportunity data (includes id for new records)
         emit('saved', { 
-            id: result.data?.id || props.opportunity?.id,
-            isNew: !props.opportunity 
+            id: savedId,
+            isNew 
         })
         emit('close')
 
