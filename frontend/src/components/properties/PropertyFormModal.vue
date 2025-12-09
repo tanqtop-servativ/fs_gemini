@@ -119,7 +119,8 @@ const loadPropertyDetails = async (prop) => {
   
   // Manual Mappings if names differ or need logic
   form.name = prop.name
-  form.address = prop.display_address
+  // Trim trailing commas/spaces that may have accumulated from legacy bug
+  form.address = (prop.display_address || '').replace(/[,\s]+$/, '')
   form.checkin = prop.check_in_time
   form.checkout = prop.check_out_time
   form.timezone = prop.time_zone
