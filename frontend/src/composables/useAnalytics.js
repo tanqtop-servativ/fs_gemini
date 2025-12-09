@@ -49,13 +49,23 @@ export function useAnalytics() {
         const tenantId = effectiveTenantId.value
         if (!tenantId) return { success: false, error: 'No tenant' }
 
-        const { data, error } = await supabase.rpc('get_retry_analysis', {
-            p_tenant_id: tenantId,
-            p_days: days
-        })
+        try {
+            const { data, error } = await supabase.rpc('get_retry_analysis', {
+                p_tenant_id: tenantId,
+                p_days: days
+            })
 
-        if (error) return { success: false, error: error.message }
-        return { success: true, data }
+            if (error) {
+                // Silently fail if RPC doesn't exist (not deployed yet)
+                if (error.message?.includes('does not exist') || error.code === '42883') {
+                    return { success: true, data: null }
+                }
+                return { success: false, error: error.message }
+            }
+            return { success: true, data }
+        } catch (e) {
+            return { success: true, data: null } // Fail gracefully
+        }
     }
 
     /**
@@ -67,13 +77,23 @@ export function useAnalytics() {
         const tenantId = effectiveTenantId.value
         if (!tenantId) return { success: false, error: 'No tenant' }
 
-        const { data, error } = await supabase.rpc('get_correction_analysis', {
-            p_tenant_id: tenantId,
-            p_days: days
-        })
+        try {
+            const { data, error } = await supabase.rpc('get_correction_analysis', {
+                p_tenant_id: tenantId,
+                p_days: days
+            })
 
-        if (error) return { success: false, error: error.message }
-        return { success: true, data }
+            if (error) {
+                // Silently fail if RPC doesn't exist (not deployed yet)
+                if (error.message?.includes('does not exist') || error.code === '42883') {
+                    return { success: true, data: null }
+                }
+                return { success: false, error: error.message }
+            }
+            return { success: true, data }
+        } catch (e) {
+            return { success: true, data: null } // Fail gracefully
+        }
     }
 
     /**
