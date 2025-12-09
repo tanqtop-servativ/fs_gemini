@@ -1,16 +1,18 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { supabase } from '../lib/supabase'
+import { useJobs } from '../composables/useJobs'
 import { 
     ArrowLeft, Calendar, Car, Play, Square, ChevronDown, ChevronUp,
-    MapPin, Pencil, ExternalLink, Mail, Clock, Users, CheckCircle2, Circle
+    MapPin, Pencil, ExternalLink, CheckCircle2, Circle
 } from 'lucide-vue-next'
 import JobPhotos from '../components/jobs/JobPhotos.vue'
 import JobComments from '../components/jobs/JobComments.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { getJobDetail, updateJobStatus, toggleTask, getStatusColor } = useJobs()
+
 const jobId = computed(() => route.params.id)
 
 const job = ref(null)
@@ -36,86 +38,55 @@ const fetchJob = async () => {
     if (!jobId.value) return
     loading.value = true
     
-    const { data, error } = await supabase
-        .from('jobs')
-        .select(`
-            *,
-            properties:property_id(id, name, address, front_photo_url),
-            service_opportunities:service_opportunity_id(id, title)
-        `)
-        .eq('id', jobId.value)
-        .is('deleted_at', null)
-        .single()
+    const result = await getJobDetail(jobId.value)
     
-    if (error) {
-        console.error(error)
+    if (!result.success) {
+        console.error(result.error)
         alert("Job not found")
         router.push('/')
         return
     }
     
+    const data = result.job
     job.value = data
-    property.value = data.properties
+    property.value = data.property
+    tasks.value = data.tasks || []
     
-    await Promise.all([fetchTasks(), fetchWorkers()])
-    loading.value = false
-}
-
-const fetchTasks = async () => {
-    const { data } = await supabase
-        .from('job_tasks')
-        .select('*')
-        .eq('job_id', jobId.value)
-        .order('id')
-    tasks.value = data || []
-}
-
-const fetchWorkers = async () => {
-    const { data } = await supabase
-        .from('job_assignments')
-        .select(`
-            id,
-            created_at,
-            people (id, first_name, last_name, email)
-        `)
-        .eq('job_id', jobId.value)
-    
-    workers.value = (data || []).map(a => ({
+    // Map assignments to worker format
+    workers.value = (data.assignments || []).map(a => ({
         ...a,
-        name: `${a.people?.first_name || ''} ${a.people?.last_name || ''}`.trim() || 'Unknown',
-        initials: `${(a.people?.first_name || 'U')[0]}${(a.people?.last_name || '')[0] || ''}`.toUpperCase(),
+        initials: a.name ? a.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U',
         status: 'Assigned',
         travelTime: null,
         timeOnJob: null
     }))
+    
+    loading.value = false
 }
 
-const toggleTask = async (task) => {
-    const newVal = !task.is_completed
-    task.is_completed = newVal
+const handleToggleTask = async (task) => {
+    const originalState = task.is_completed
+    task.is_completed = !task.is_completed // Optimistic
     
-    const { error } = await supabase
-        .from('job_tasks')
-        .update({ is_completed: newVal })
-        .eq('id', task.id)
+    const result = await toggleTask(task.id)
     
-    if (error) {
-        task.is_completed = !newVal
-        console.error(error)
+    if (!result.success) {
+        task.is_completed = originalState // Revert
+        console.error(result.error)
+    }
+}
+
+const handleStatusUpdate = async (newStatus) => {
+    const result = await updateJobStatus(jobId.value, newStatus)
+    
+    if (result.success) {
+        job.value.status = newStatus
+    } else {
+        alert(result.error)
     }
 }
 
 const completedCount = computed(() => tasks.value.filter(t => t.is_completed).length)
-
-const updateStatus = async (newStatus) => {
-    const { error } = await supabase
-        .from('jobs')
-        .update({ status: newStatus })
-        .eq('id', jobId.value)
-    
-    if (error) alert(error.message)
-    else job.value.status = newStatus
-}
 
 // Action button states
 const actionStates = computed(() => {
@@ -199,7 +170,7 @@ onMounted(fetchJob)
                       <MapPin class="text-gray-500" size="48" />
                   </div>
                   
-                  <!-- Stats overlay (if available) -->
+                  <!-- Stats overlay -->
                   <div class="absolute top-2 left-2 flex gap-2">
                       <div v-if="property" class="bg-blue-600 text-white text-[10px] px-2 py-1 rounded font-bold">
                           {{ property.name?.length > 15 ? property.name.slice(0,15) + '...' : property.name }}
@@ -262,7 +233,7 @@ onMounted(fetchJob)
                               <Calendar size="20" />
                           </button>
                           <div class="text-xs font-medium text-blue-600 mt-1">SCHEDULE</div>
-                          <div class="text-[10px] text-gray-400">{{ job?.scheduled_date || '—' }}</div>
+                          <div class="text-[10px] text-gray-400">—</div>
                       </div>
                       
                       <!-- OMW -->
@@ -279,7 +250,7 @@ onMounted(fetchJob)
                       <div class="text-center">
                           <div class="text-[10px] text-gray-400 uppercase mb-1">UNDO</div>
                           <button 
-                            @click="updateStatus('In Progress')"
+                            @click="handleStatusUpdate('In Progress')"
                             class="w-12 h-12 rounded-full flex items-center justify-center transition"
                             :class="actionStates.started ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-blue-100'"
                           >
@@ -293,7 +264,7 @@ onMounted(fetchJob)
                       <div class="text-center">
                           <div class="text-[10px] text-gray-400 uppercase mb-1">UNDO</div>
                           <button 
-                            @click="updateStatus('Complete')"
+                            @click="handleStatusUpdate('Complete')"
                             class="w-12 h-12 rounded-full flex items-center justify-center transition"
                             :class="actionStates.finished ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-green-100'"
                           >
@@ -381,7 +352,7 @@ onMounted(fetchJob)
                             v-for="task in tasks" 
                             :key="task.id" 
                             class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 cursor-pointer"
-                            @click="toggleTask(task)"
+                            @click="handleToggleTask(task)"
                           >
                               <CheckCircle2 v-if="task.is_completed" size="20" class="text-green-500 fill-green-50" />
                               <Circle v-else size="20" class="text-gray-300" />

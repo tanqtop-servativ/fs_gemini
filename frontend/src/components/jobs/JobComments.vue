@@ -1,28 +1,27 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { supabase } from '../../lib/supabase'
+import { ref, onMounted, watch } from 'vue'
 import { Send, MessageSquare } from 'lucide-vue-next'
 import { useAuth } from '../../composables/useAuth'
+import { useJobs } from '../../composables/useJobs'
 
 const props = defineProps({
   jobId: String
 })
 
+const { listComments, addComment } = useJobs()
+const { user, userProfile } = useAuth()
+
 const comments = ref([])
 const newComment = ref('')
 const loading = ref(true)
 const sending = ref(false)
-const { user } = useAuth()
 
 const fetchComments = async () => {
+    if (!props.jobId) return
     loading.value = true
-    const { data } = await supabase
-        .from('job_comments')
-        .select('*')  // Simplified - no profile join for now
-        .eq('job_id', props.jobId)
-        .order('created_at', { ascending: true })
     
-    comments.value = data || []
+    const result = await listComments(props.jobId)
+    comments.value = result.success ? result.comments : []
     loading.value = false
     scrollToBottom()
 }
@@ -31,14 +30,14 @@ const sendComment = async () => {
     if (!newComment.value.trim()) return
     sending.value = true
     
-    const { error } = await supabase.from('job_comments').insert({
-        job_id: props.jobId,
-        user_id: user.value.id,
-        content: newComment.value
-    })
+    // Use person_id from profile if available, otherwise user.id
+    const authorId = userProfile.value?.person_id || user.value?.id
+    
+    const result = await addComment(props.jobId, authorId, newComment.value)
 
-    if (error) alert("Error sending: " + error.message)
-    else {
+    if (!result.success) {
+        alert("Error sending: " + result.error)
+    } else {
         newComment.value = ''
         fetchComments()
     }
@@ -46,30 +45,25 @@ const sendComment = async () => {
 }
 
 const scrollToBottom = () => {
-    // Simple timeout to wait for render
     setTimeout(() => {
         const el = document.getElementById('comments-container')
         if (el) el.scrollTop = el.scrollHeight
     }, 100)
 }
 
-onMounted(fetchComments)
+watch(() => props.jobId, fetchComments, { immediate: true })
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div class="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-          <MessageSquare size="16" class="text-gray-500" />
-          <h3 class="font-bold text-slate-700 text-sm uppercase">Comments</h3>
-      </div>
-      
-      <div id="comments-container" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-          <div v-if="comments.length === 0" class="text-center text-gray-400 text-xs py-10 italic">No comments yet.</div>
+  <div class="flex flex-col">
+      <div id="comments-container" class="max-h-64 overflow-y-auto p-4 space-y-4">
+          <div v-if="loading" class="text-center text-gray-400 text-xs py-4">Loading...</div>
+          <div v-else-if="comments.length === 0" class="text-center text-gray-400 text-xs py-6 italic">No comments yet.</div>
           
-          <div v-for="c in comments" :key="c.id" class="flex flex-col" :class="{'items-end': c.user_id === user?.id, 'items-start': c.user_id !== user?.id}">
-              <div class="max-w-[85%] bg-white border border-gray-100 p-3 rounded-lg shadow-sm" :class="{'bg-blue-50 border-blue-100': c.user_id === user?.id}">
+          <div v-for="c in comments" :key="c.id" class="flex flex-col items-start">
+              <div class="max-w-[85%] bg-gray-50 border border-gray-100 p-3 rounded-lg">
                   <div class="text-[10px] text-gray-400 mb-1 flex justify-between gap-4">
-                      <span class="font-bold text-slate-600">{{ c.user_id?.slice(0,8) || 'User' }}</span>
+                      <span class="font-bold text-slate-600">{{ c.author?.name || 'Unknown' }}</span>
                       <span>{{ new Date(c.created_at).toLocaleString() }}</span>
                   </div>
                   <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ c.content }}</p>
