@@ -9,7 +9,6 @@ import { useVisits } from '../composables/useVisits'
 import { supabase } from '../lib/supabase'
 import SortableHeader from '../components/SortableHeader.vue'
 import TableSearch from '../components/TableSearch.vue'
-import ContextMenu from '../components/ContextMenu.vue'
 
 const router = useRouter()
 
@@ -359,12 +358,52 @@ const softDeleteJob = async () => {
     </div>
 
     <!-- Context Menu -->
-    <ContextMenu 
-        v-model="showContextMenu" 
-        :x="contextMenuX" 
-        :y="contextMenuY" 
-        :options="getContextMenuOptions()"
-    />
+    <Teleport to="body">
+      <div 
+        v-if="showContextMenu" 
+        class="fixed inset-0 z-50"
+        @click="showContextMenu = false"
+        @contextmenu.prevent="showContextMenu = false"
+      >
+        <div 
+          class="absolute bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[180px]"
+          :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
+          @click.stop
+        >
+          <div class="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 truncate max-w-[200px]">
+            {{ contextJob?.title }}
+          </div>
+          <button 
+            @click="openReschedule"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+          >
+            <Calendar class="w-4 h-4" />
+            Reschedule
+          </button>
+          <button 
+            @click="unscheduleJob"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+          >
+            <X class="w-4 h-4" />
+            Unschedule
+          </button>
+          <button 
+            @click="openAssignModal"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+          >
+            <UserPlus class="w-4 h-4" />
+            Assign Crew
+          </button>
+          <button 
+            @click="softDeleteJob"
+            class="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+          >
+            <Trash2 class="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Reschedule Modal -->
     <Teleport to="body">
