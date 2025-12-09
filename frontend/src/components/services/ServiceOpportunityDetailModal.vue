@@ -264,6 +264,12 @@ const statusColor = (s) => {
                  </div>
             </div>
 
+            <!-- Dismissal Reason (when dismissed) -->
+            <div v-if="opportunity.status === 'Dismissed' && opportunity.dismissal_reason" class="bg-red-50 border border-red-200 rounded-xl p-4">
+                 <label class="block text-xs font-bold uppercase text-red-400 mb-1">Dismissal Reason</label>
+                 <div class="text-sm text-red-700 font-medium">{{ opportunity.dismissal_reason }}</div>
+            </div>
+
             <!-- Workflow Section -->
             <div>
                  <div class="flex justify-between items-center mb-3">
