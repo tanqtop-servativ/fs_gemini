@@ -57,7 +57,7 @@ BEGIN
         'id', prop_record.id,
         'tenant_id', prop_record.tenant_id,
         'name', prop_record.name,
-        'address', prop_record.address,
+        'street_address', prop_record.street_address,
         'city', prop_record.city,
         'state', prop_record.state,
         'zip', prop_record.zip,
