@@ -54,12 +54,12 @@ const form = reactive({
   city: '',
   state: '',
   zip: '',
-  checkin: '16:00',
-  checkout: '10:00',
-  timezone: 'US/Mountain',
+  check_in_time: '16:00',
+  check_out_time: '10:00',
+  time_zone: 'US/Mountain',
   is_dst: false,
-  hcp_cust: '',
-  hcp_addr: '',
+  hcp_customer_id: '',
+  hcp_address_id: '',
   wifi_network: '',
   wifi_password: '',
   door_code: '',
@@ -70,14 +70,14 @@ const form = reactive({
   bedrooms: 0,
   bathrooms: 0,
   max_guests: 0,
-  sq_ft: 0,
-  sinks: 0,
-  baths_mats: 0,
+  square_footage: 0,
+  bathroom_sinks: 0,
+  bath_mats: 0,
   has_pool: false,
   has_bbq: false,
   allows_pets: false,
   has_casita: false,
-  parking: '',
+  parking_instructions: '',
   front_photo_url: '',
   owner_ids: [],
   manager_ids: [],
@@ -124,28 +124,19 @@ const fetchDropdowns = async () => {
 
 const loadPropertyDetails = async (prop) => {
   console.log('[PropertyForm] Loading property details:', prop)
-  // Populate basic fields
+  // Populate basic fields - now form field names match DB column names so direct mapping works
   Object.keys(form).forEach(k => {
-    // Map props to form if keys match, else handle manually
     if (prop[k] !== undefined) form[k] = prop[k]
   })
   
-  // Manual Mappings if names differ or need logic
+  // Fields that still need manual handling
   form.name = prop.name
-  // Load discrete address fields
-  form.street_address = prop.address || ''  // DB column is 'address' but we call it street_address in form
+  form.street_address = prop.street_address || ''
   form.city = prop.city || ''
   form.state = prop.state || ''
   form.zip = prop.zip || ''
-  form.checkin = prop.check_in_time
-  form.checkout = prop.check_out_time
-  form.timezone = prop.time_zone
-  form.is_dst = prop.is_dst
-  form.hcp_cust = prop.hcp_customer_id
-  form.hcp_addr = prop.hcp_address_id
-  form.sq_ft = prop.square_footage
-  form.sinks = prop.bathroom_sinks
-  form.baths_mats = prop.bath_mats
+  form.front_photo_url = prop.front_photo_url || ''
+  form.parking_instructions = prop.parking_instructions || ''
   
   // Extract IDs from owners/managers arrays (RPC returns {id, name} objects)
   form.owner_ids = (prop.owners || []).map(o => o.id)
@@ -176,9 +167,9 @@ const loadPropertyDetails = async (prop) => {
 
 const resetForm = () => {
   Object.keys(form).forEach(k => form[k] = (typeof form[k] === 'boolean' ? false : (Array.isArray(form[k]) ? [] : '')))
-  form.checkin = '16:00'
-  form.checkout = '10:00'
-  form.timezone = 'US/Mountain'
+  form.check_in_time = '16:00'
+  form.check_out_time = '10:00'
+  form.time_zone = 'US/Mountain'
   inventory.value = []
   feeds.value = []
   refPhotos.value = []
@@ -390,11 +381,11 @@ onUnmounted(() => {
         <div class="bg-slate-50 p-3 rounded border border-slate-100">
           <label class="block text-xs font-bold uppercase text-gray-500 mb-2">Timings</label>
           <div class="space-y-2">
-            <div><span class="text-xs text-gray-400 block">Check-in</span><input v-model="form.checkin" type="time" class="w-full border p-1 rounded text-sm"></div>
-            <div><span class="text-xs text-gray-400 block">Check-out</span><input v-model="form.checkout" type="time" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-xs text-gray-400 block">Check-in</span><input v-model="form.check_in_time" type="time" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-xs text-gray-400 block">Check-out</span><input v-model="form.check_out_time" type="time" class="w-full border p-1 rounded text-sm"></div>
             <div>
               <span class="text-xs text-gray-400 block">Time Zone</span>
-              <select v-model="form.timezone" class="w-full border p-1 rounded text-sm bg-white">
+              <select v-model="form.time_zone" class="w-full border p-1 rounded text-sm bg-white">
                 <option value="UTC">UTC</option>
                 <option value="US/Pacific">US/Pacific</option>
                 <option value="US/Mountain">US/Mountain</option>
@@ -414,9 +405,9 @@ onUnmounted(() => {
             <div><span class="text-[10px] text-gray-400 block">Beds</span><input v-model="form.bedrooms" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
             <div><span class="text-[10px] text-gray-400 block">Baths</span><input v-model="form.bathrooms" type="number" step="0.5" min="0" class="w-full border p-1 rounded text-sm"></div>
             <div><span class="text-[10px] text-gray-400 block">Guests</span><input v-model="form.max_guests" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
-            <div><span class="text-[10px] text-gray-400 block">Sq Ft</span><input v-model="form.sq_ft" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
-            <div><span class="text-[10px] text-gray-400 block">Sinks</span><input v-model="form.sinks" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
-            <div><span class="text-[10px] text-gray-400 block">Mats</span><input v-model="form.baths_mats" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Sq Ft</span><input v-model="form.square_footage" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Sinks</span><input v-model="form.bathroom_sinks" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Mats</span><input v-model="form.bath_mats" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
           </div>
         </div>
 
@@ -477,7 +468,7 @@ onUnmounted(() => {
         <!-- Parking -->
         <div>
           <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Parking Instructions</label>
-          <textarea v-model="form.parking" class="w-full border p-2 rounded text-sm h-20 resize-none" placeholder="Enter parking details..."></textarea>
+          <textarea v-model="form.parking_instructions" class="w-full border p-2 rounded text-sm h-20 resize-none" placeholder="Enter parking details..."></textarea>
         </div>
 
         <!-- Access Codes -->
@@ -575,11 +566,11 @@ onUnmounted(() => {
         <div class="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
           <div>
             <label class="block text-xs font-bold uppercase text-gray-500 mb-1">HCP Customer ID</label>
-            <input v-model="form.hcp_cust" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 12345">
+            <input v-model="form.hcp_customer_id" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 12345">
           </div>
           <div>
             <label class="block text-xs font-bold uppercase text-gray-500 mb-1">HCP Address ID</label>
-            <input v-model="form.hcp_addr" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 67890">
+            <input v-model="form.hcp_address_id" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 67890">
           </div>
         </div>
 
