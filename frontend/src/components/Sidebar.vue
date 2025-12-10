@@ -3,6 +3,9 @@ import { computed } from 'vue'
 import { Home, Calendar, Users, ClipboardList, LogOut, GitMerge, Package, Shield, Activity, Zap, X, LayoutDashboard, Briefcase, BarChart3, Terminal } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useDebugLifecycle } from '../composables/useDebugLifecycle'
+
+useDebugLifecycle('Sidebar')
 
 const router = useRouter()
 const { 

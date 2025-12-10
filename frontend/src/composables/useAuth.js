@@ -76,14 +76,18 @@ export function useAuth() {
     })
 
     const initAuth = async () => {
+        console.log('[AUTH] initAuth called, isInitialized:', isInitialized)
         // Prevent duplicate initialization
         if (isInitialized) {
+            console.log('[AUTH] Already initialized, skipping')
             return
         }
-        
+
         loading.value = true
+        console.log('[AUTH] Getting session...')
         const { data } = await supabase.auth.getSession()
         user.value = data.session?.user ?? null
+        console.log('[AUTH] Session user:', user.value?.id)
 
         if (user.value) {
             await fetchProfile(user.value.id)
@@ -93,27 +97,67 @@ export function useAuth() {
 
         // Only set up listener if not already subscribed
         if (!authSubscription) {
+            console.log('[AUTH] Setting up auth state listener')
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-                if (session?.user) {
-                    user.value = session.user
-                    await fetchProfile(session.user.id)
-                } else {
+                console.log('[AUTH] Auth state changed:', _event, session?.user?.id)
+
+                // Defensive check: Ignore SIGNED_OUT if localStorage has valid session
+                // This prevents Supabase's spurious SIGNED_OUT events from clearing valid auth
+                if (!session || !session.user) {
+                    // Check if we have a valid session in localStorage
+                    const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+                    if (storageKey) {
+                        try {
+                            const data = JSON.parse(localStorage.getItem(storageKey))
+                            if (data?.access_token && data?.expires_at) {
+                                const expiresAtMs = data.expires_at * 1000
+                                if (Date.now() < expiresAtMs) {
+                                    console.log('[AUTH] Ignoring SIGNED_OUT - localStorage has valid session')
+                                    return // Ignore this SIGNED_OUT event
+                                }
+                            }
+                        } catch (e) {
+                            // If parse fails, proceed with sign out
+                        }
+                    }
+
+                    // Truly signed out - clear state
+                    console.log('[AUTH] Clearing user state (genuine sign out)')
                     user.value = null
                     userProfile.value = null
+                } else {
+                    // Signed in - check if it's the same user before re-fetching
+                    if (user.value?.id === session.user.id && userProfile.value?.id === session.user.id) {
+                        console.log('[AUTH] Ignoring redundant SIGNED_IN for same user')
+                        return // Skip redundant profile fetch
+                    }
+
+                    // Different user or first sign in - update state
+                    user.value = session.user
+                    await fetchProfile(session.user.id)
                 }
             })
             authSubscription = subscription
         }
-        
+
         isInitialized = true
+        console.log('[AUTH] Initialization complete')
     }
 
     const fetchProfile = async (userId) => {
-        const { data } = await supabase
+        console.log('[AUTH] fetchProfile called for userId:', userId)
+        const { data, error } = await supabase
             .from('profiles')
             .select('*, tenants:tenant_id(name)')
             .eq('id', userId)
             .single()
+
+        if (error) {
+            console.error('[AUTH] Error fetching profile:', error)
+            return
+        }
+
+        console.log('[AUTH] Profile fetched successfully:', data)
         userProfile.value = data
 
         // If superuser and impersonating tenant, fetch the impersonated tenant name

@@ -4,7 +4,7 @@ import { useProperties } from '../../composables/useProperties'
 import AuditHistory from '../AuditHistory.vue'
 import { 
   X, Pencil, Image as ImageIcon, FileText, 
-  MapPin, Check, Wifi, Key, Home, Calendar, Clock, Archive
+  MapPin, Check, Wifi, Key, Home, Calendar, Clock, Archive, ExternalLink
 } from 'lucide-vue-next'
 
 const props = defineProps({

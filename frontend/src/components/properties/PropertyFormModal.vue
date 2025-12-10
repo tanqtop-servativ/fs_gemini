@@ -10,7 +10,7 @@ import {
 } from 'lucide-vue-next'
 
 const { userProfile } = useAuth()
-const { saveProperty, deleteProperty } = useProperties()
+const { saveProperty, archiveProperty, getPropertyDetail } = useProperties()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -39,6 +39,7 @@ const handleDelete = async () => {
 // Component State
 const loading = ref(false)
 const saving = ref(false)
+const errorMessage = ref('')
 const activeTab = ref('details') // details, photos, inventory, feeds, attachments
 
 // Dropdown Data
@@ -49,10 +50,13 @@ const catalog = ref([])
 // Form State
 const form = reactive({
   name: '',
-  address: '',
+  street_address: '',
+  city: '',
+  state: '',
+  zip: '',
   checkin: '16:00',
-  checkout: '11:00',
-  timezone: 'UTC',
+  checkout: '10:00',
+  timezone: 'US/Mountain',
   is_dst: false,
   hcp_cust: '',
   hcp_addr: '',
@@ -90,7 +94,15 @@ watch(() => props.isOpen, async (open) => {
     loading.value = true
     await fetchDropdowns()
     if (props.property) {
-      await loadPropertyDetails(props.property)
+      // Fetch full property details via RPC to get discrete fields and assignments
+      const result = await getPropertyDetail(props.property.id)
+      if (result.success) {
+        await loadPropertyDetails(result.property)
+      } else {
+        console.error('Failed to load property details:', result.error)
+        // Fall back to using the prop data
+        await loadPropertyDetails(props.property)
+      }
     } else {
       resetForm()
     }
@@ -111,6 +123,7 @@ const fetchDropdowns = async () => {
 }
 
 const loadPropertyDetails = async (prop) => {
+  console.log('[PropertyForm] Loading property details:', prop)
   // Populate basic fields
   Object.keys(form).forEach(k => {
     // Map props to form if keys match, else handle manually
@@ -119,8 +132,11 @@ const loadPropertyDetails = async (prop) => {
   
   // Manual Mappings if names differ or need logic
   form.name = prop.name
-  // Trim trailing commas/spaces that may have accumulated from legacy bug
-  form.address = (prop.display_address || '').replace(/[,\s]+$/, '')
+  // Load discrete address fields
+  form.street_address = prop.address || ''  // DB column is 'address' but we call it street_address in form
+  form.city = prop.city || ''
+  form.state = prop.state || ''
+  form.zip = prop.zip || ''
   form.checkin = prop.check_in_time
   form.checkout = prop.check_out_time
   form.timezone = prop.time_zone
@@ -131,8 +147,9 @@ const loadPropertyDetails = async (prop) => {
   form.sinks = prop.bathroom_sinks
   form.baths_mats = prop.bath_mats
   
-  form.owner_ids = prop.owner_ids || []
-  form.manager_ids = prop.manager_ids || []
+  // Extract IDs from owners/managers arrays (RPC returns {id, name} objects)
+  form.owner_ids = (prop.owners || []).map(o => o.id)
+  form.manager_ids = (prop.managers || []).map(m => m.id)
   
   // Fetch lists
   const [resCodes, resFeeds, resInv, resRef, resAtt] = await Promise.all([
@@ -160,8 +177,8 @@ const loadPropertyDetails = async (prop) => {
 const resetForm = () => {
   Object.keys(form).forEach(k => form[k] = (typeof form[k] === 'boolean' ? false : (Array.isArray(form[k]) ? [] : '')))
   form.checkin = '16:00'
-  form.checkout = '11:00'
-  form.timezone = 'UTC'
+  form.checkout = '10:00'
+  form.timezone = 'US/Mountain'
   inventory.value = []
   feeds.value = []
   refPhotos.value = []
@@ -226,9 +243,17 @@ const onAddressInput = (e) => {
       const data = await res.json()
       addressSuggestions.value = (data.features || []).map(f => {
         const p = f.properties
-        let streetPart = p.street || p.name || ''
-        if (p.housenumber) streetPart = `${p.housenumber} ${streetPart}`
-        return [streetPart, p.city, p.state, p.postcode, p.country].filter(Boolean).join(', ')
+        let street = p.street || p.name || ''
+        if (p.housenumber) street = `${p.housenumber} ${street}`
+        const fullAddress = [street, p.city, p.state, p.postcode, p.country].filter(Boolean).join(', ')
+        return {
+          street: street.trim(),
+          city: p.city || '',
+          state: p.state || '',
+          zip: p.postcode || '',
+          country: p.country || '',
+          fullAddress  // For display in dropdown
+        }
       })
       showAddressSuggestions.value = addressSuggestions.value.length > 0
     } catch (err) {
@@ -237,10 +262,13 @@ const onAddressInput = (e) => {
   }, 400)
 }
 
-const selectAddress = (addr) => {
-  form.address = addr
-  addressSuggestions.value = []
+const selectAddress = (suggestion) => {
+  form.street_address = suggestion.street
+  form.city = suggestion.city
+  form.state = suggestion.state
+  form.zip = suggestion.zip
   showAddressSuggestions.value = false
+  addressSuggestions.value = []
 }
 
 const hideAddressSuggestions = () => {
@@ -259,18 +287,26 @@ const handleFrontPhoto = async (e) => {
      const url = await uploadFile(file, path)
      form.front_photo_url = url
   } catch (err) {
-    alert("Upload failed: " + err.message)
+    errorMessage.value = "Upload failed: " + err.message
   }
 }
 
 // Logic: Save
 const saveData = async () => {
+  errorMessage.value = ''
   if (!form.name || !form.owner_ids.length || !form.manager_ids.length) {
-    return alert("Name, Owner, and Manager are required.")
+    errorMessage.value = "Name, Owner, and Manager are required."
+    return
   }
   
   saving.value = true
 
+  console.log('[PropertyForm] Saving with data:', {
+    id: props.property?.id,
+    owner_ids: form.owner_ids,
+    manager_ids: form.manager_ids,
+    details: form
+  })
 
   try {
     const result = await saveProperty({
@@ -284,7 +320,7 @@ const saveData = async () => {
     emit('saved')
     emit('close')
   } catch (e) {
-    alert("Save failed: " + e.message)
+    errorMessage.value = "Save failed: " + e.message
     console.error(e)
   } finally {
     saving.value = false
@@ -329,6 +365,12 @@ onUnmounted(() => {
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto flex flex-col md:flex-row gap-6">
+      
+      <!-- Error Banner -->
+      <div v-if="errorMessage" class="absolute top-0 left-0 right-0 bg-red-100 border-b border-red-300 text-red-800 px-4 py-3 text-sm font-medium flex justify-between items-center rounded-t-xl">
+        <span>{{ errorMessage }}</span>
+        <button @click="errorMessage = ''" class="text-red-600 hover:text-red-800 font-bold">×</button>
+      </div>
       
       <!-- LEFT COLUMN (1/3) -->
       <div class="w-full md:w-1/3 space-y-6">
@@ -401,23 +443,34 @@ onUnmounted(() => {
         <!-- Name -->
         <input v-model="form.name" class="w-full border p-2 rounded" placeholder="Property Name">
         
-        <!-- Address with Autocomplete -->
-        <div class="flex gap-2">
-          <select class="border p-2 rounded bg-white text-sm"><option value="us">🇺🇸</option><option value="ca">🇨🇦</option></select>
-          <div class="relative flex-1">
-            <input 
-              v-model="form.address" 
-              @input="onAddressInput" 
-              @blur="hideAddressSuggestions"
-              class="w-full border p-2 rounded" 
-              placeholder="Full Address"
-              autocomplete="off"
-            >
-            <div v-if="showAddressSuggestions && addressSuggestions.length > 0" class="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-              <div v-for="(addr, idx) in addressSuggestions" :key="idx" @mousedown="selectAddress(addr)" class="p-2 hover:bg-blue-50 cursor-pointer text-xs border-b border-gray-50 last:border-0">
-                {{ addr }}
+        <!-- Address Fields with Autocomplete -->
+        <div class="space-y-2">
+          <!-- Street Address with Autocomplete -->
+          <div class="flex gap-2">
+            <select class="border p-2 rounded bg-white text-sm"><option value="us">🇺🇸</option><option value="ca">🇨🇦</option></select>
+            <div class="relative flex-1">
+              <input 
+                v-model="form.street_address" 
+                @input="onAddressInput" 
+                @blur="hideAddressSuggestions"
+                class="w-full border p-2 rounded" 
+                placeholder="Street Address"
+                autocomplete="off"
+              >
+              <div v-if="showAddressSuggestions && addressSuggestions.length > 0" class="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                <div v-for="(suggestion, idx) in addressSuggestions" :key="idx" @mousedown="selectAddress(suggestion)" class="p-2 hover:bg-blue-50 cursor-pointer text-xs border-b border-gray-50 last:border-0">
+                  <div class="font-bold text-slate-700">{{ suggestion.street }}</div>
+                  <div class="text-gray-500">{{ suggestion.fullAddress }}</div>
+                </div>
               </div>
             </div>
+          </div>
+          
+          <!-- City, State, Zip -->
+          <div class="grid grid-cols-6 gap-2">
+            <input v-model="form.city" class="col-span-3 border p-2 rounded" placeholder="City">
+            <input v-model="form.state" class="col-span-1 border p-2 rounded uppercase" placeholder="State" maxlength="2">
+            <input v-model="form.zip" class="col-span-2 border p-2 rounded" placeholder="Zip Code" maxlength="10">
           </div>
         </div>
 

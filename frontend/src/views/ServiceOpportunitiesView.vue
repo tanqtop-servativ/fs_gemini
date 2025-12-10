@@ -11,6 +11,9 @@ import { useAuth } from '../composables/useAuth'
 import { useServiceOpportunities } from '../composables/useServiceOpportunities'
 import { useTableControls } from '../composables/useTableControls'
 import { perfLog } from '../lib/perfLog'
+import { useDebugLifecycle } from '../composables/useDebugLifecycle'
+
+useDebugLifecycle('ServiceOpportunitiesView')
 
 const router = useRouter()
 const route = useRoute()

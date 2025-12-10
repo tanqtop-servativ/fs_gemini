@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { Clock, Calendar, CheckCircle2, AlertTriangle, Briefcase } from 'lucide-vue-next'
 import { useAuth } from '../composables/useAuth'
 import { useDashboard } from '../composables/useDashboard'
+import { useDebugLifecycle } from '../composables/useDebugLifecycle'
+
+useDebugLifecycle('DashboardView')
 
 const router = useRouter()
 const loading = ref(true)

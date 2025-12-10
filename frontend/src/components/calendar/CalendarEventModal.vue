@@ -50,9 +50,9 @@ const clipboardText = computed(() => {
 const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(clipboardText.value)
-    alert('Copied to clipboard!')
+    // Silent copy - no alert needed
   } catch (err) {
-    alert('Failed to copy: ' + err.message)
+    console.error('Failed to copy:', err.message)
   }
 }
 

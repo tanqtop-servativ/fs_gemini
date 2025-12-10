@@ -14,8 +14,12 @@ export function useCommandLine() {
     const { listPeople } = usePeople()
     const { fetchOpportunities } = useServiceOpportunities()
 
-    const commandHistory = ref([])
-    const outputLines = ref([])
+    // Restore from localStorage if available
+    const savedHistory = localStorage.getItem('cli_history')
+    const savedOutput = localStorage.getItem('cli_output')
+
+    const commandHistory = ref(savedHistory ? JSON.parse(savedHistory) : [])
+    const outputLines = ref(savedOutput ? JSON.parse(savedOutput) : [])
     const isProcessing = ref(false)
 
     // Cached data for searching
@@ -104,17 +108,116 @@ export function useCommandLine() {
 
     // Add an output line with optional styling
     // text can be a string OR an array of segments: { text, type, link }
+    // Routes to addOutputInternal which respects redirect mode
     const addOutput = (text, type = 'normal') => {
-        outputLines.value.push({
-            content: Array.isArray(text) ? text : [{ text, type }],
-            timestamp: new Date()
-        })
+        addOutputInternal(text, type)
     }
 
     // Clear terminal output
     const clearOutput = () => {
         outputLines.value = []
+        commandHistory.value = []
+        // Clear persisted state
+        localStorage.removeItem('cli_history')
+        localStorage.removeItem('cli_output')
         addOutput('Terminal cleared.', 'system')
+    }
+
+    // File download state
+    let redirectBuffer = null
+    let redirectFilename = null
+
+    // Trigger browser file download
+    const downloadFile = (filename, content) => {
+        const blob = new Blob([content], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+    }
+
+    // Structured data buffer for JSON/CSV exports
+    let redirectData = null
+    let redirectDataType = null  // 'jobs', 'properties', 'people', 'opps'
+
+    // Convert array of objects to CSV string
+    const toCSV = (data, entityType) => {
+        if (!data || data.length === 0) return ''
+
+        // Define columns per entity type for cleaner output
+        const columnDefs = {
+            jobs: ['id', 'status', 'property_name', 'template_name', 'scheduled_date', 'created_at'],
+            properties: ['id', 'name', 'address', 'city', 'state', 'zip'],
+            people: ['id', 'first_name', 'last_name', 'email', 'phone'],
+            opps: ['id', 'workflow_status', 'property_name', 'service_template_name', 'due_date', 'created_at']
+        }
+
+        const columns = columnDefs[entityType] || Object.keys(data[0])
+        const header = columns.join(',')
+
+        const rows = data.map(item => {
+            return columns.map(col => {
+                let val = item[col]
+                // Handle nested properties
+                if (col === 'property_name' && !val) val = item.properties?.name || ''
+                if (col === 'template_name' && !val) val = item.job_templates?.name || ''
+                if (col === 'service_template_name' && !val) val = item.service_templates?.name || ''
+
+                // Escape CSV values
+                if (val === null || val === undefined) return ''
+                const str = String(val)
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`
+                }
+                return str
+            }).join(',')
+        })
+
+        return [header, ...rows].join('\n')
+    }
+
+    // Helper: Save to localStorage
+    const saveToLocalStorage = () => {
+        try {
+            // Limit history to last 100 commands
+            const historyToSave = commandHistory.value.slice(-100)
+            // Limit output to last 200 lines
+            const outputToSave = outputLines.value.slice(-200)
+
+            localStorage.setItem('cli_history', JSON.stringify(historyToSave))
+            localStorage.setItem('cli_output', JSON.stringify(outputToSave))
+        } catch (e) {
+            // Silently fail if localStorage is full
+            console.warn('Failed to save CLI state:', e)
+        }
+    }
+
+    // Add output - respects redirect mode
+    const addOutputInternal = (text, type = 'normal') => {
+        // If we're in redirect mode, capture to buffer instead
+        if (redirectBuffer !== null) {
+            // Extract plain text from segments
+            if (Array.isArray(text)) {
+                const line = text.map(seg => seg.text || '').join('')
+                redirectBuffer.push(line)
+            } else {
+                redirectBuffer.push(text)
+            }
+            return
+        }
+
+        // Normal output to terminal
+        outputLines.value.push({
+            content: Array.isArray(text) ? text : [{ text, type }],
+            timestamp: new Date()
+        })
+
+        // Save to localStorage after adding output
+        saveToLocalStorage()
     }
 
     // Show help text
@@ -145,6 +248,13 @@ export function useCommandLine() {
         addOutput('║    help / ?          Show this help                          ║', 'help')
         addOutput('║    history           Show command history                    ║', 'help')
         addOutput('║    time              Show current time                       ║', 'help')
+        addOutput('║                                                              ║', 'help')
+        addOutput('║  FILE EXPORT                                                 ║', 'help')
+        addOutput('║    <cmd> > file      Download output as file                 ║', 'help')
+        addOutput('║    <cmd> | clipboard Copy output to clipboard                ║', 'help')
+        addOutput('║    <cmd> | json      Copy as JSON to clipboard               ║', 'help')
+        addOutput('║    <cmd> | csv       Copy as CSV to clipboard                ║', 'help')
+        addOutput('║    Example: j | json                                         ║', 'help')
         addOutput('╚══════════════════════════════════════════════════════════════╝', 'help')
     }
 
@@ -176,6 +286,11 @@ export function useCommandLine() {
                 const result = await fetchJobs()
                 if (!result.success) throw new Error(result.error)
                 cachedJobs.value = result.jobs || []
+
+                // Store data for structured output
+                redirectData = cachedJobs.value
+                redirectDataType = 'jobs'
+
                 const recentJobs = cachedJobs.value.slice(0, 10)
                 addOutput(`Jobs (${cachedJobs.value.length} total, showing first 10):`, 'info')
                 recentJobs.forEach(job => {
@@ -190,6 +305,11 @@ export function useCommandLine() {
                 const result = await listProperties()
                 if (!result.success) throw new Error(result.error)
                 cachedProperties.value = result.properties || []
+
+                // Store data for structured output
+                redirectData = cachedProperties.value
+                redirectDataType = 'properties'
+
                 addOutput(`Properties (${cachedProperties.value.length} total):`, 'info')
                 cachedProperties.value.slice(0, 15).forEach(prop => {
                     addOutput([
@@ -205,6 +325,11 @@ export function useCommandLine() {
                 const result = await listPeople()
                 if (!result.success) throw new Error(result.error)
                 cachedPeople.value = result.people || []
+
+                // Store data for structured output
+                redirectData = cachedPeople.value
+                redirectDataType = 'people'
+
                 addOutput(`People (${cachedPeople.value.length} total):`, 'info')
                 cachedPeople.value.slice(0, 15).forEach(person => {
                     const name = [person.first_name, person.last_name].filter(Boolean).join(' ') || 'Unnamed'
@@ -214,6 +339,11 @@ export function useCommandLine() {
                 const result = await fetchOpportunities()
                 if (!result.success) throw new Error(result.error)
                 cachedOpportunities.value = result.opportunities || []
+
+                // Store data for structured output
+                redirectData = cachedOpportunities.value
+                redirectDataType = 'opps'
+
                 addOutput(`Service Opportunities (${cachedOpportunities.value.length} total, showing first 10):`, 'info')
                 cachedOpportunities.value.slice(0, 10).forEach(opp => {
                     const propName = opp.property_name || 'Unknown'
@@ -346,19 +476,31 @@ export function useCommandLine() {
     // Refresh all data
     const refreshAll = async () => {
         addOutput('Refreshing all data...', 'info')
+        console.log('[CLI DEBUG] refreshAll started, tenantId:', effectiveTenantId.value)
         try {
-            const [jobsRes, propsRes, peopleRes, oppsRes] = await Promise.all([
-                fetchJobs(),
-                listProperties(),
-                listPeople(),
-                fetchOpportunities()
-            ])
+            console.log('[CLI DEBUG] Calling fetchJobs...')
+            const jobsRes = await fetchJobs()
+            console.log('[CLI DEBUG] fetchJobs completed')
+
+            console.log('[CLI DEBUG] Calling listProperties...')
+            const propsRes = await listProperties()
+            console.log('[CLI DEBUG] listProperties completed')
+
+            console.log('[CLI DEBUG] Calling listPeople...')
+            const peopleRes = await listPeople()
+            console.log('[CLI DEBUG] listPeople completed')
+
+            console.log('[CLI DEBUG] Calling fetchOpportunities...')
+            const oppsRes = await fetchOpportunities()
+            console.log('[CLI DEBUG] fetchOpportunities completed')
+
             cachedJobs.value = jobsRes.jobs || []
             cachedProperties.value = propsRes.properties || []
             cachedPeople.value = peopleRes.people || []
             cachedOpportunities.value = oppsRes.opportunities || []
             addOutput('All data refreshed successfully.', 'success')
         } catch (err) {
+            console.error('[CLI DEBUG] refreshAll error:', err)
             addOutput(`Error refreshing: ${err.message}`, 'error')
         }
     }
@@ -380,13 +522,61 @@ export function useCommandLine() {
         const trimmed = input.trim()
         if (!trimmed) return
 
+        // Defensive reset: ensure previous pipe state doesn't affect new commands
+        redirectBuffer = null
+        redirectData = null
+        redirectDataType = null
+        redirectFilename = null
+
+        // Check for file redirect syntax: command > filename.txt
+        const redirectMatch = trimmed.match(/^(.+?)\s*>\s*([\w.-]+)$/)
+        // Check for clipboard pipe syntax: command | clipboard
+        const clipboardMatch = trimmed.match(/^(.+?)\s*\|\s*clipboard$/i)
+        // Check for JSON pipe syntax: command | json
+        const jsonMatch = trimmed.match(/^(.+?)\s*\|\s*json$/i)
+        // Check for CSV pipe syntax: command | csv
+        const csvMatch = trimmed.match(/^(.+?)\s*\|\s*csv$/i)
+
+        let actualCommand = trimmed
+        let isRedirect = false
+        let isClipboard = false
+        let isJson = false
+        let isCsv = false
+
+        if (redirectMatch) {
+            actualCommand = redirectMatch[1].trim()
+            redirectFilename = redirectMatch[2]
+            redirectBuffer = []
+            isRedirect = true
+        } else if (clipboardMatch) {
+            actualCommand = clipboardMatch[1].trim()
+            redirectBuffer = []
+            isClipboard = true
+        } else if (jsonMatch) {
+            actualCommand = jsonMatch[1].trim()
+            redirectBuffer = []
+            redirectData = null
+            isJson = true
+        } else if (csvMatch) {
+            actualCommand = csvMatch[1].trim()
+            redirectBuffer = []
+            redirectData = null
+            isCsv = true
+        }
+
         commandHistory.value.push(trimmed)
-        addOutput(`$ ${trimmed}`, 'command')
+        saveToLocalStorage() // Persist command history
+
+        // Show command in terminal (not redirected)
+        outputLines.value.push({
+            content: [{ text: `$ ${trimmed}`, type: 'command' }],
+            timestamp: new Date()
+        })
 
         isProcessing.value = true
 
         try {
-            const parts = trimmed.split(/\s+/)
+            const parts = actualCommand.split(/\s+/)
             const cmd = parts[0].toLowerCase()
             const args = parts.slice(1)
 
@@ -505,6 +695,93 @@ export function useCommandLine() {
         } catch (err) {
             addOutput(`Error: ${err.message}`, 'error')
         } finally {
+            // Handle file redirect/download
+            if (isRedirect && redirectBuffer !== null) {
+                const content = redirectBuffer.join('\n')
+                downloadFile(redirectFilename, content)
+
+                // Show confirmation in terminal
+                outputLines.value.push({
+                    content: [{ text: `Downloaded: ${redirectFilename} (${content.length} bytes)`, type: 'success' }],
+                    timestamp: new Date()
+                })
+
+                // Reset redirect state
+                redirectBuffer = null
+                redirectFilename = null
+            }
+
+            // Handle clipboard pipe
+            if (isClipboard && redirectBuffer !== null) {
+                const content = redirectBuffer.join('\n')
+
+                try {
+                    await navigator.clipboard.writeText(content)
+
+                    // Show confirmation in terminal
+                    outputLines.value.push({
+                        content: [{ text: `Copied to clipboard (${content.length} bytes)`, type: 'success' }],
+                        timestamp: new Date()
+                    })
+                } catch (clipErr) {
+                    outputLines.value.push({
+                        content: [{ text: `Clipboard error: ${clipErr.message}`, type: 'error' }],
+                        timestamp: new Date()
+                    })
+                }
+
+                // Reset redirect state
+                redirectBuffer = null
+            }
+
+            // Handle JSON pipe
+            if (isJson && redirectData !== null) {
+                const content = JSON.stringify(redirectData, null, 2)
+
+                try {
+                    await navigator.clipboard.writeText(content)
+
+                    outputLines.value.push({
+                        content: [{ text: `JSON copied to clipboard (${redirectData.length} records, ${content.length} bytes)`, type: 'success' }],
+                        timestamp: new Date()
+                    })
+                } catch (clipErr) {
+                    outputLines.value.push({
+                        content: [{ text: `Clipboard error: ${clipErr.message}`, type: 'error' }],
+                        timestamp: new Date()
+                    })
+                }
+
+                // Reset
+                redirectBuffer = null
+                redirectData = null
+                redirectDataType = null
+            }
+
+            // Handle CSV pipe
+            if (isCsv && redirectData !== null) {
+                const content = toCSV(redirectData, redirectDataType)
+
+                try {
+                    await navigator.clipboard.writeText(content)
+
+                    outputLines.value.push({
+                        content: [{ text: `CSV copied to clipboard (${redirectData.length} records)`, type: 'success' }],
+                        timestamp: new Date()
+                    })
+                } catch (clipErr) {
+                    outputLines.value.push({
+                        content: [{ text: `Clipboard error: ${clipErr.message}`, type: 'error' }],
+                        timestamp: new Date()
+                    })
+                }
+
+                // Reset
+                redirectBuffer = null
+                redirectData = null
+                redirectDataType = null
+            }
+
             isProcessing.value = false
         }
     }

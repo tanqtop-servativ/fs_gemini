@@ -106,11 +106,26 @@ const router = createRouter({
         }
     ]
 })
+// Use synchronous localStorage check instead of async getSession to prevent navigation pileup
+router.beforeEach((to, from, next) => {
+    // SYNC check - Supabase stores session in localStorage
+    // This avoids the async pileup that was freezing the UI
+    const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    let isAuthenticated = false
 
-router.beforeEach(async (to, from, next) => {
-    // Direct check to Supabase - this is synchronous from localStorage cache
-    const { data: { session } } = await supabase.auth.getSession()
-    const isAuthenticated = !!session
+    if (storageKey) {
+        try {
+            const data = JSON.parse(localStorage.getItem(storageKey))
+            // Check if session exists and isn't expired
+            if (data?.access_token && data?.expires_at) {
+                const expiresAtMs = data.expires_at * 1000
+                isAuthenticated = Date.now() < expiresAtMs
+            }
+        } catch (e) {
+            // If parse fails, fall back to unauthenticated
+            isAuthenticated = false
+        }
+    }
 
     if (to.meta.requiresAuth && !isAuthenticated) {
         next('/login')

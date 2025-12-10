@@ -3,7 +3,7 @@ import { ref, watch, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../composables/useAuth'
 import { useServiceTemplates } from '../../composables/useServiceTemplates'
-import { X, Save, Plus, GripVertical, Trash2, ListTree } from 'lucide-vue-next'
+import { X, Save, Plus, GripVertical, Trash2, ListTree, GitMerge } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 
 const props = defineProps({

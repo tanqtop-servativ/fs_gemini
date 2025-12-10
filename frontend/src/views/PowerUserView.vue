@@ -22,13 +22,24 @@ const tabCompletions = ref([])
 const tabIndex = ref(0)
 
 // Focus input on mount
-onMounted(() => {
-    inputRef.value?.focus()
+onMounted(async () => {
+  inputRef.value?.focus()
+
+  // Only show welcome banner once per session
+  if (!sessionStorage.getItem('cli_welcome_shown')) {
     addOutput('╔══════════════════════════════════════════════════════════════╗', 'welcome')
     addOutput('║          SERVATIVPRO POWER USER CLI v1.0                     ║', 'welcome')
     addOutput('║          Type "help" or "?" for available commands           ║', 'welcome')
     addOutput('╚══════════════════════════════════════════════════════════════╝', 'welcome')
     addOutput('', 'normal')
+    sessionStorage.setItem('cli_welcome_shown', 'true')
+  }
+
+  // Ensure we start scrolled to the bottom if there is existing output (history)
+  await nextTick()
+  if (outputRef.value) {
+    outputRef.value.scrollTop = outputRef.value.scrollHeight
+  }
 })
 
 // Auto-scroll to bottom when output changes

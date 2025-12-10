@@ -1,8 +1,12 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useAuth } from './composables/useAuth'
+import { useDebugLifecycle } from './composables/useDebugLifecycle'
 import Sidebar from './components/Sidebar.vue'
 import AppHeader from './components/AppHeader.vue'
+
+// Debug: Track App lifecycle
+useDebugLifecycle('App')
 
 const { initAuth, user, loading } = useAuth()
 

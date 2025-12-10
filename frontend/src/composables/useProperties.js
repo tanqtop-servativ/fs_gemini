@@ -43,7 +43,10 @@ export function useProperties() {
 
         const payload = {
             p_name: details.name,
-            p_address: details.address || '',
+            p_street_address: details.street_address || '',
+            p_city: details.city || '',
+            p_state: details.state || '',
+            p_zip: details.zip || '',
             p_checkin: details.checkin || null,
             p_checkout: details.checkout || null,
             p_time_zone: details.timezone || 'UTC',
@@ -77,14 +80,18 @@ export function useProperties() {
             p_tenant_id: tenantId
         }
 
+        console.log('[useProperties] Payload to RPC:', payload)
+
         try {
             let error
             if (id) {
                 // Update existing
+                console.log('[useProperties] Calling update_property_safe with:', { ...payload, p_id: id })
                 const res = await supabase.rpc('update_property_safe', { ...payload, p_id: id })
                 error = res.error
             } else {
                 // Create new
+                console.log('[useProperties] Calling create_property_safe with:', payload)
                 const res = await supabase.rpc('create_property_safe', payload)
                 error = res.error
             }

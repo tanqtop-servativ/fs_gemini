@@ -15,6 +15,9 @@ import { useCalendar } from '../composables/useCalendar'
 import CalendarEventModal from '../components/calendar/CalendarEventModal.vue'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import { perfLog } from '../lib/perfLog'
+import { useDebugLifecycle } from '../composables/useDebugLifecycle'
+
+useDebugLifecycle('CalendarView')
 
 // Refs for UI state
 const route = useRoute()
