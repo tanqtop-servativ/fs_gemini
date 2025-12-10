@@ -230,27 +230,25 @@ const onAddressInput = (e) => {
   
   addressDebounce = setTimeout(async () => {
     try {
-      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`)
+      const apiKey = import.meta.env.VITE_RADAR_API_KEY
+      const res = await fetch(
+        `https://api.radar.io/v1/search/autocomplete?query=${encodeURIComponent(query)}&layers=address&country=US&limit=5`,
+        { headers: { 'Authorization': apiKey } }
+      )
       const data = await res.json()
-      addressSuggestions.value = (data.features || []).map(f => {
-        const p = f.properties
-        let street = p.street || p.name || ''
-        if (p.housenumber) street = `${p.housenumber} ${street}`
-        const fullAddress = [street, p.city, p.state, p.postcode, p.country].filter(Boolean).join(', ')
-        return {
-          street: street.trim(),
-          city: p.city || '',
-          state: p.state || '',
-          zip: p.postcode || '',
-          country: p.country || '',
-          fullAddress  // For display in dropdown
-        }
-      })
+      addressSuggestions.value = (data.addresses || []).map(addr => ({
+        street: addr.addressLabel || addr.formattedAddress?.split(',')[0] || '',
+        city: addr.city || '',
+        state: addr.stateCode || addr.state || '',
+        zip: addr.postalCode || '',
+        country: addr.country || 'US',
+        fullAddress: addr.formattedAddress || ''
+      }))
       showAddressSuggestions.value = addressSuggestions.value.length > 0
     } catch (err) {
       console.error('Address search failed:', err)
     }
-  }, 400)
+  }, 300)
 }
 
 const selectAddress = (suggestion) => {
