@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, reactive, onMounted } from 'vue'
+import { ref, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useServiceOpportunities } from '../../composables/useServiceOpportunities'
 import { X, Save, Calendar, Building, FileText, Smartphone } from 'lucide-vue-next'
@@ -141,6 +141,21 @@ const handleClose = () => {
     }
     emit('close')
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    handleClose()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>

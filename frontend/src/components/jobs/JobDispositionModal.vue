@@ -74,8 +74,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { supabase } from '../../lib/supabase'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useJobs } from '../../composables/useJobs'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -83,6 +83,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'disposed'])
+
+const { disposeJob } = useJobs()
 
 const submitting = ref(false)
 const form = ref({
@@ -115,20 +117,35 @@ const canSubmit = computed(() => {
 const handleSubmit = async () => {
   submitting.value = true
   
-  const { data, error } = await supabase.rpc('dispose_job', {
-    p_job_id: props.jobId,
-    p_disposition_type: form.value.type,
-    p_reason: form.value.reason
-  })
+  const { success, disposition_id, error } = await disposeJob(
+    props.jobId, 
+    form.value.type, 
+    form.value.reason
+  )
   
   submitting.value = false
   
-  if (error) {
-    alert('Error: ' + error.message)
+  if (!success) {
+    alert('Error: ' + error)
     return
   }
   
-  emit('disposed', { dispositionId: data, type: form.value.type })
+  emit('disposed', { dispositionId: disposition_id, type: form.value.type })
   emit('close')
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.show) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>

@@ -97,6 +97,12 @@ const router = createRouter({
             name: 'worker-home',
             component: () => import('../views/WorkerHomeView.vue'),
             meta: { requiresAuth: true }
+        },
+        {
+            path: '/power-user',
+            name: 'power-user',
+            component: () => import('../views/PowerUserView.vue'),
+            meta: { requiresAuth: true }
         }
     ]
 })

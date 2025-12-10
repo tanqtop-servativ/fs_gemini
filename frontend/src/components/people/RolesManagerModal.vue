@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../composables/useAuth'
 import { X, Plus, Pencil, Trash2, RotateCcw, GripVertical, History } from 'lucide-vue-next'
@@ -136,6 +136,21 @@ const formatTime = (ts) => {
     if (!ts) return ''
     return new Date(ts).toLocaleString()
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>

@@ -39,7 +39,13 @@ export function useCalendar() {
      * @returns {Promise<{success: boolean, events?: Array, error?: string}>}
      */
     const fetchEvents = async ({ propertyId = 'all' } = {}) => {
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) {
+            return { success: false, error: 'Tenant ID not found' }
+        }
+
         let query = supabase.from('master_calendar').select('*')
+            .eq('tenant_id', tenantId)
 
         if (propertyId !== 'all') {
             // Specific property: show ALL events (including iCal bookings)

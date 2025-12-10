@@ -219,9 +219,11 @@ export function useServiceOpportunities() {
      * Fetch service opportunities with filtering and related jobs
      * @param {Object} options
      * @param {Array<string>} [options.statusFilter] - Status values to include
+     * @param {number} [options.limit] - Max records to fetch (default: 100)
+     * @param {number} [options.offset] - Offset for pagination
      * @returns {Promise<{success: boolean, opportunities?: Array, jobsMap?: Object, error?: string}>}
      */
-    const fetchOpportunities = async ({ statusFilter = [] } = {}) => {
+    const fetchOpportunities = async ({ statusFilter = [], limit = 100, offset = 0 } = {}) => {
         const tenantId = effectiveTenantId.value
         if (!tenantId) {
             return { success: false, error: 'Tenant ID not found' }
@@ -244,6 +246,11 @@ export function useServiceOpportunities() {
         // Status filtering
         if (statusFilter.length > 0) {
             query = query.in('status', statusFilter)
+        }
+
+        // Apply pagination
+        if (limit) {
+            query = query.range(offset, offset + limit - 1)
         }
 
         const { data: opps, error } = await query.order('created_at', { ascending: false })

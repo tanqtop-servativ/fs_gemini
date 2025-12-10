@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import AuditHistory from '../AuditHistory.vue'
 import { supabase } from '../../lib/supabase'
 import { X, Pencil, Trash2 } from 'lucide-vue-next'
@@ -35,6 +35,21 @@ const handleDelete = async () => {
         emit('close')
     }
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>

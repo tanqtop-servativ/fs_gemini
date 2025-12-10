@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 
 const user = ref(null)
@@ -26,20 +26,8 @@ if (storedUserImpersonation) {
     impersonatedUserName.value = storedUserName
 }
 
-// Track auth subscription - MODULE SCOPE SINGLETON
+// Track auth subscription to prevent duplicates (MODULE SCOPE SINGLETON)
 let authSubscription = null
-let isInitialized = false
-
-// Cleanup function for HMR
-if (import.meta.hot) {
-    import.meta.hot.dispose(() => {
-        if (authSubscription) {
-            authSubscription.unsubscribe()
-            authSubscription = null
-            isInitialized = false
-        }
-    })
-}
 
 export function useAuth() {
     // === TENANT IMPERSONATION (Superuser) ===
@@ -76,11 +64,6 @@ export function useAuth() {
     })
 
     const initAuth = async () => {
-        // Prevent duplicate initialization
-        if (isInitialized) {
-            return
-        }
-        
         loading.value = true
         const { data } = await supabase.auth.getSession()
         user.value = data.session?.user ?? null
@@ -104,8 +87,6 @@ export function useAuth() {
             })
             authSubscription = subscription
         }
-        
-        isInitialized = true
     }
 
     const fetchProfile = async (userId) => {

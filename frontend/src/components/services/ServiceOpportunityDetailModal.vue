@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, computed, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useServiceOpportunities } from '../../composables/useServiceOpportunities'
 import { useVisits } from '../../composables/useVisits'
@@ -220,12 +220,24 @@ const handleUndismiss = async () => {
 }
 
 const statusColor = (s) => {
-    if (s === 'Complete' || s === 'Captured') return 'bg-green-100 text-green-700'
-    if (s === 'In Progress') return 'bg-blue-100 text-blue-700'
-    if (s === 'Snoozed') return 'bg-amber-100 text-amber-800'
-    if (s === 'Dismissed') return 'bg-red-50 text-red-600'
-    return 'bg-gray-100 text-gray-600'
+    const map = { Open: 'bg-green-100 text-green-800', Pending: 'bg-yellow-100 text-yellow-800', Completed: 'bg-blue-100 text-blue-800', Dismissed: 'bg-gray-100 text-gray-500' }
+    return map[s] || 'bg-gray-100 text-gray-600'
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>

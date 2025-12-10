@@ -148,13 +148,13 @@ BEGIN
     WITH job_visits AS (
         SELECT 
             j.id AS job_id,
-            j.type AS job_type,
+            j.title AS job_type,
             COUNT(v.id) AS visit_count
         FROM jobs j
         JOIN visits v ON v.job_id = j.id
         WHERE j.tenant_id = p_tenant_id
           AND j.created_at > now() - (p_days || ' days')::interval
-        GROUP BY j.id, j.type
+        GROUP BY j.id, j.title
     )
     SELECT jsonb_build_object(
         'period_days', p_days,
@@ -198,35 +198,47 @@ CREATE OR REPLACE FUNCTION get_correction_analysis(p_tenant_id UUID, p_days INT 
 RETURNS JSONB AS $$
 DECLARE
     v_result JSONB;
+    v_by_job_type JSONB;
+    v_total_completions BIGINT;
+    v_total_corrections BIGINT;
 BEGIN
-    SELECT jsonb_build_object(
+    -- Get totals first
+    SELECT 
+        COUNT(*) FILTER (WHERE artifact_type = 'CompletionArtifact'),
+        COUNT(*) FILTER (WHERE corrects_artifact_id IS NOT NULL)
+    INTO v_total_completions, v_total_corrections
+    FROM artifacts
+    WHERE tenant_id = p_tenant_id
+      AND submitted_at > now() - (p_days || ' days')::interval;
+
+    -- Get by_job_type separately
+    SELECT jsonb_agg(jsonb_build_object(
+        'job_type', job_title,
+        'completions', completions,
+        'corrections', corrections,
+        'rate', ROUND(corrections::numeric / NULLIF(completions, 0) * 100, 1)
+    ))
+    INTO v_by_job_type
+    FROM (
+        SELECT 
+            j.title AS job_title,
+            COUNT(*) FILTER (WHERE a2.artifact_type = 'CompletionArtifact') AS completions,
+            COUNT(*) FILTER (WHERE a2.corrects_artifact_id IS NOT NULL) AS corrections
+        FROM artifacts a2
+        JOIN jobs j ON j.id = a2.job_id
+        WHERE a2.tenant_id = p_tenant_id
+          AND a2.submitted_at > now() - (p_days || ' days')::interval
+        GROUP BY j.title
+    ) sub;
+
+    -- Build final result
+    v_result := jsonb_build_object(
         'period_days', p_days,
-        'total_completions', COUNT(*) FILTER (WHERE a.artifact_type = 'CompletionArtifact'),
-        'total_corrections', COUNT(*) FILTER (WHERE a.corrects_artifact_id IS NOT NULL),
-        'correction_rate', ROUND(
-            COUNT(*) FILTER (WHERE a.corrects_artifact_id IS NOT NULL)::numeric /
-            NULLIF(COUNT(*) FILTER (WHERE a.artifact_type = 'CompletionArtifact'), 0) * 100
-        , 1),
-        'by_job_type', (
-            SELECT jsonb_agg(jsonb_build_object(
-                'job_type', j.type,
-                'completions', COUNT(*) FILTER (WHERE a2.artifact_type = 'CompletionArtifact'),
-                'corrections', COUNT(*) FILTER (WHERE a2.corrects_artifact_id IS NOT NULL),
-                'rate', ROUND(
-                    COUNT(*) FILTER (WHERE a2.corrects_artifact_id IS NOT NULL)::numeric /
-                    NULLIF(COUNT(*) FILTER (WHERE a2.artifact_type = 'CompletionArtifact'), 0) * 100
-                , 1)
-            ))
-            FROM artifacts a2
-            JOIN jobs j ON j.id = a2.job_id
-            WHERE a2.tenant_id = p_tenant_id
-              AND a2.submitted_at > now() - (p_days || ' days')::interval
-            GROUP BY j.type
-        )
-    ) INTO v_result
-    FROM artifacts a
-    WHERE a.tenant_id = p_tenant_id
-      AND a.submitted_at > now() - (p_days || ' days')::interval;
+        'total_completions', v_total_completions,
+        'total_corrections', v_total_corrections,
+        'correction_rate', ROUND(v_total_corrections::numeric / NULLIF(v_total_completions, 0) * 100, 1),
+        'by_job_type', COALESCE(v_by_job_type, '[]'::jsonb)
+    );
     
     RETURN v_result;
 END;

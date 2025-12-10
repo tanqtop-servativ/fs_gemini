@@ -178,7 +178,7 @@ BEGIN
                 'last_name', p.last_name,
                 'email', p.email,
                 'phone', p.phone,
-                'auth_user_id', p.auth_user_id,
+                'user_id', p.user_id,
                 'created_at', p.created_at,
                 'roles', (
                     SELECT COALESCE(jsonb_agg(
@@ -220,7 +220,7 @@ BEGIN
         'last_name', person_record.last_name,
         'email', person_record.email,
         'phone', person_record.phone,
-        'auth_user_id', person_record.auth_user_id,
+        'user_id', person_record.user_id,
         'tenant_id', person_record.tenant_id,
         'created_at', person_record.created_at,
         'roles', (

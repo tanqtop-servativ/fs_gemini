@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, reactive } from 'vue'
+import { ref, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useJobTemplates } from '../../composables/useJobTemplates'
 import { useAuth } from '../../composables/useAuth'
@@ -204,6 +204,21 @@ const handleClose = () => {
     }
     emit('close')
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    handleClose()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>

@@ -128,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useSpecialService } from '../../composables/useSpecialService'
 
 const props = defineProps({
@@ -202,5 +202,17 @@ onMounted(() => {
   if (categories.value.length === 0) {
     loadCategories()
   }
+  document.addEventListener('keydown', handleKeydown)
 })
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.show) {
+    emit('close')
+  }
+}
 </script>

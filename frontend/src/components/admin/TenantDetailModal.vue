@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, reactive, computed } from 'vue'
+import { ref, watch, reactive, computed, onMounted, onUnmounted } from 'vue'
 import AuditHistory from '../AuditHistory.vue'
 import { useTenants } from '../../composables/useTenants'
 import { X, Pencil, Trash2, Plus, ArrowRight } from 'lucide-vue-next'
@@ -103,7 +103,7 @@ const saveAdmin = async () => {
 }
 
 const deleteAdmin = async (uid) => {
-    if (!confirm("Remove this admin user?")) return
+    if (!confirm("Remove this admin?")) return
     const result = await manageTenantUser({
         operation: 'DELETE',
         tenantId: props.tenant.id,
@@ -115,6 +115,21 @@ const deleteAdmin = async (uid) => {
         fetchAdmins()
     }
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>

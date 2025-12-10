@@ -14,27 +14,22 @@ export function useJobs() {
      * @param {Array<string>} [options.statusFilter] - Status values to include
      * @returns {Promise<{success: boolean, jobs?: Array, error?: string}>}
      */
+    /**
+     * Fetch jobs list with filtering via RPC
+     * @param {Object} options
+     * @param {Array<string>} [options.statusFilter] - Status values to include
+     * @returns {Promise<{success: boolean, jobs?: Array, error?: string}>}
+     */
     const fetchJobs = async ({ statusFilter = [] } = {}) => {
         const tenantId = effectiveTenantId.value
         if (!tenantId) {
             return { success: false, error: 'Tenant ID not found' }
         }
 
-        let query = supabase
-            .from('jobs')
-            .select(`
-                *,
-                properties (name),
-                service_opportunities (title, due_date)
-            `)
-            .eq('tenant_id', tenantId)
-            .is('deleted_at', null)
-
-        if (statusFilter.length > 0) {
-            query = query.in('status', statusFilter)
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false })
+        const { data, error } = await supabase.rpc('list_jobs', {
+            p_tenant_id: tenantId,
+            p_status_filter: statusFilter.length > 0 ? statusFilter : null
+        })
 
         if (error) {
             return { success: false, error: error.message }
@@ -221,6 +216,26 @@ export function useJobs() {
         return 'bg-gray-100 text-gray-600'
     }
 
+    /**
+     * Dispose job via RPC
+     * @param {string} jobId
+     * @param {string} type - cancelled, not_required, deferred
+     * @param {string} reason
+     * @returns {Promise<{success: boolean, disposition_id?: string, error?: string}>}
+     */
+    const disposeJob = async (jobId, type, reason) => {
+        const { data, error } = await supabase.rpc('dispose_job', {
+            p_job_id: jobId,
+            p_disposition_type: type,
+            p_reason: reason
+        })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true, disposition_id: data }
+    }
+
     return {
         // List
         fetchJobs,
@@ -228,6 +243,7 @@ export function useJobs() {
         getJobDetail,
         updateJobStatus,
         toggleTask,
+        disposeJob,
         // Comments
         addComment,
         listComments,

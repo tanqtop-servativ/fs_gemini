@@ -43,8 +43,8 @@ watch(userProfile, (newVal) => {
 
 onMounted(() => {
     perfLog.mount('ActivityFeed')
-    autoRefresh.value = setInterval(fetchFeed, 30000)
-    perfLog.startInterval(autoRefresh.value, 'ActivityFeed', 30000)
+    // autoRefresh.value = setInterval(fetchFeed, 30000)
+    // perfLog.startInterval(autoRefresh.value, 'ActivityFeed', 30000)
 })
 
 onUnmounted(() => {

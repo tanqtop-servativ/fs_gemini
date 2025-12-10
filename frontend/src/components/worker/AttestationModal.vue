@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { CheckCircle, AlertTriangle } from 'lucide-vue-next'
 import { useWorkerStatus } from '../../composables/useWorkerStatus'
 import { useAuth } from '../../composables/useAuth'
@@ -264,4 +264,19 @@ const handleSubmitIncompletion = async () => {
     submitting.value = false
   }
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.show) {
+    emit('cancel')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>

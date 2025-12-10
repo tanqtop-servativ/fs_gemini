@@ -70,7 +70,9 @@ const fetchData = async (isBackground = false) => {
     if (!isBackground) loading.value = true
     
     // Use composable to fetch opportunities
-    const result = await fetchOpportunities({ statusFilter: statusFilter.value })
+    // Limit to 100 to prevent UI freezes with large datasets
+    const limit = 100
+    const result = await fetchOpportunities({ statusFilter: statusFilter.value, limit })
     if (result.success) {
         items.value = result.opportunities
         jobsMap.value = result.jobsMap
@@ -136,8 +138,9 @@ onMounted(() => {
     document.addEventListener('click', handleGlobalClick)
 
     // Setup Polling
-    autoRefresh.value = setInterval(() => fetchData(true), 30000)
-    perfLog.startInterval(autoRefresh.value, 'ServiceOpportunitiesView', 30000)
+    // Setup Polling
+    // autoRefresh.value = setInterval(() => fetchData(true), 30000)
+    // perfLog.startInterval(autoRefresh.value, 'ServiceOpportunitiesView', 30000)
 })
 
 onUnmounted(() => {
@@ -253,6 +256,9 @@ const handleContextMenu = (e, item) => {
             class="text-xs font-bold text-amber-600 mt-1 cursor-pointer hover:underline flex items-center gap-1"
         >
             <Clock size="12" /> Snoozed ({{ snoozedCount }})
+        </p>
+        <p class="text-xs text-slate-400 mt-1" v-if="items.length > 0">
+            Showing {{ items.length }} recent items
         </p>
     </div>
       

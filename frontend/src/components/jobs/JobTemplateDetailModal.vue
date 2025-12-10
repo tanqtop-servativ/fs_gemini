@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import AuditHistory from '../AuditHistory.vue'
 import { X, Pencil, CheckSquare, PenTool, Shield } from 'lucide-vue-next'
@@ -34,6 +34,21 @@ watch(() => props.isOpen, (open) => {
 const tasks = computed(() => {
     if (!props.template || !props.template.job_template_tasks) return []
     return props.template.job_template_tasks.sort((a, b) => a.sort_order - b.sort_order)
+})
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

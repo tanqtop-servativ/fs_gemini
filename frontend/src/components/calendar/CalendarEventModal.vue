@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { X, Copy, Calendar, Home, MapPin, Tag, FileText, Key } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -55,6 +55,21 @@ const copyToClipboard = async () => {
     alert('Failed to copy: ' + err.message)
   }
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>

@@ -43,36 +43,37 @@ export function useProperties() {
 
         const payload = {
             p_name: details.name,
-            p_address: details.address,
-            p_checkin: details.checkin,
-            p_checkout: details.checkout,
-            p_time_zone: details.timezone,
-            p_is_dst: details.is_dst,
-            p_hcp_cust: details.hcp_cust,
-            p_hcp_addr: details.hcp_addr,
-            p_wifi_network: details.wifi_network,
-            p_wifi_password: details.wifi_password,
-            p_door_code: details.door_code,
-            p_garage_code: details.garage_code,
-            p_gate_code: details.gate_code,
-            p_closet_code: details.closet_code,
-            p_bedrooms: details.bedrooms,
-            p_bathrooms: details.bathrooms,
-            p_max_guests: details.max_guests,
-            p_square_footage: details.sq_ft,
-            p_bathroom_sinks: details.sinks,
-            p_bath_mats: details.baths_mats,
-            p_has_pool: details.has_pool,
-            p_has_bbq: details.has_bbq,
-            p_allows_pets: details.allows_pets,
-            p_has_casita: details.has_casita,
-            p_casita_code: details.casita_code,
-            p_parking_instructions: details.parking,
-            p_photo_url: details.front_photo_url,
-            p_owner_ids: details.owner_ids,
-            p_manager_ids: details.manager_ids,
+            p_address: details.address || '',
+            p_checkin: details.checkin || null,
+            p_checkout: details.checkout || null,
+            p_time_zone: details.timezone || 'UTC',
+            p_is_dst: !!details.is_dst,
+            p_hcp_cust: details.hcp_cust || null,
+            p_hcp_addr: details.hcp_addr || null,
+            p_wifi_network: details.wifi_network || '',
+            p_wifi_password: details.wifi_password || '',
+            p_door_code: details.door_code || '',
+            p_garage_code: details.garage_code || '',
+            p_gate_code: details.gate_code || '',
+            p_closet_code: details.closet_code || '',
+            p_casita_code: details.casita_code || '',
+            p_bedrooms: Number(details.bedrooms) || 0,
+            p_bathrooms: Number(details.bathrooms) || 0,
+            p_max_guests: Number(details.max_guests) || 0,
+            p_square_footage: Number(details.sq_ft) || 0,
+            p_bathroom_sinks: Number(details.sinks) || 0,
+            p_bath_mats: Number(details.baths_mats) || 0,
+            p_has_pool: !!details.has_pool,
+            p_has_bbq: !!details.has_bbq,
+            p_allows_pets: !!details.allows_pets,
+            p_has_casita: !!details.has_casita,
+            p_parking_instructions: details.parking || '',
+            p_photo_url: details.front_photo_url || null,
+            p_owner_ids: details.owner_ids || [],
+            p_manager_ids: details.manager_ids || [],
             p_feeds: feeds.map(f => ({ id: f.id, name: f.name, url: f.url })),
             p_inventory: inventory,
+            p_attachments: [],
             p_tenant_id: tenantId
         }
 
@@ -116,24 +117,25 @@ export function useProperties() {
      * Fetch all properties for current tenant
      * @returns {Promise<{success: boolean, properties?: Array, error?: string}>}
      */
+    /**
+     * Fetch all properties for current tenant via RPC
+     * @returns {Promise<{success: boolean, properties?: Array, error?: string}>}
+     */
     const listProperties = async () => {
         const tenantId = effectiveTenantId.value
         if (!tenantId) {
             return { success: false, error: 'Tenant ID not found' }
         }
 
-        const { data, error } = await supabase
-            .from('properties')
-            .select('*')
-            .eq('tenant_id', tenantId)
-            .eq('status', 'active')
-            .is('deleted_at', null)
-            .order('name')
+        const { data, error } = await supabase.rpc('list_properties', {
+            p_tenant_id: tenantId,
+            p_include_archived: false
+        })
 
         if (error) {
             return { success: false, error: error.message }
         }
-        return { success: true, properties: data }
+        return { success: true, properties: data || [] }
     }
 
     /**

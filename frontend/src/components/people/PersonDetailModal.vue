@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import AuditHistory from '../AuditHistory.vue'
 import { X, Pencil, Mail, RotateCcw } from 'lucide-vue-next'
 
@@ -13,6 +13,21 @@ const emit = defineEmits(['close', 'edit', 'restore'])
 const initials = computed(() => {
     if (!props.person) return ''
     return (props.person.first_name[0] + (props.person.last_name ? props.person.last_name[0] : '')).toUpperCase()
+})
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

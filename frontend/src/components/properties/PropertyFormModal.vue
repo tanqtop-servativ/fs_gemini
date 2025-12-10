@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, reactive } from 'vue'
+import { ref, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { uploadFile } from '../../lib/upload'
 import { useAuth } from '../../composables/useAuth'
@@ -205,6 +205,51 @@ const addFeed = () => {
   feeds.value.push({ name: 'Airbnb', url: '', id: null })
 }
 
+// Logic: Address Autocomplete (Photon API)
+const addressSuggestions = ref([])
+const showAddressSuggestions = ref(false)
+let addressDebounce = null
+
+const onAddressInput = (e) => {
+  const query = e.target.value
+  clearTimeout(addressDebounce)
+  
+  if (!query || query.length < 3) {
+    addressSuggestions.value = []
+    showAddressSuggestions.value = false
+    return
+  }
+  
+  addressDebounce = setTimeout(async () => {
+    try {
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`)
+      const data = await res.json()
+      addressSuggestions.value = (data.features || []).map(f => {
+        const p = f.properties
+        let streetPart = p.street || p.name || ''
+        if (p.housenumber) streetPart = `${p.housenumber} ${streetPart}`
+        return [streetPart, p.city, p.state, p.postcode, p.country].filter(Boolean).join(', ')
+      })
+      showAddressSuggestions.value = addressSuggestions.value.length > 0
+    } catch (err) {
+      console.error('Address search failed:', err)
+    }
+  }, 400)
+}
+
+const selectAddress = (addr) => {
+  form.address = addr
+  addressSuggestions.value = []
+  showAddressSuggestions.value = false
+}
+
+const hideAddressSuggestions = () => {
+  // Delay to allow click event on suggestion to fire first
+  setTimeout(() => {
+    showAddressSuggestions.value = false
+  }, 200)
+}
+
 // Logic: Photo Upload
 const handleFrontPhoto = async (e) => {
   const file = e.target.files[0]
@@ -264,184 +309,237 @@ const handleClose = () => {
     }
     emit('close')
 }
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    handleClose()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto flex flex-col md:flex-row gap-6">
       
-      <!-- Header -->
-      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-        <h2 class="text-lg font-bold text-slate-900">{{ property ? 'Edit Property' : 'New Property' }}</h2>
-        <button @click="handleClose" class="text-gray-400 hover:text-black transition"><X size="20" /></button>
+      <!-- LEFT COLUMN (1/3) -->
+      <div class="w-full md:w-1/3 space-y-6">
+        <!-- Front Photo -->
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-500 mb-2">Front Photo</label>
+          <div class="mb-2">
+            <img v-if="form.front_photo_url" :src="form.front_photo_url" class="w-full h-32 object-cover rounded-lg border border-gray-200">
+            <div v-else class="w-full h-32 bg-slate-50 rounded-lg border border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-xs">No Photo</div>
+          </div>
+          <label class="cursor-pointer text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200">
+            <input type="file" @change="handleFrontPhoto" class="text-xs" accept="image/*">
+          </label>
+        </div>
+
+        <!-- Timings -->
+        <div class="bg-slate-50 p-3 rounded border border-slate-100">
+          <label class="block text-xs font-bold uppercase text-gray-500 mb-2">Timings</label>
+          <div class="space-y-2">
+            <div><span class="text-xs text-gray-400 block">Check-in</span><input v-model="form.checkin" type="time" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-xs text-gray-400 block">Check-out</span><input v-model="form.checkout" type="time" class="w-full border p-1 rounded text-sm"></div>
+            <div>
+              <span class="text-xs text-gray-400 block">Time Zone</span>
+              <select v-model="form.timezone" class="w-full border p-1 rounded text-sm bg-white">
+                <option value="UTC">UTC</option>
+                <option value="US/Pacific">US/Pacific</option>
+                <option value="US/Mountain">US/Mountain</option>
+                <option value="US/Arizona">US/Arizona</option>
+                <option value="US/Central">US/Central</option>
+                <option value="US/Eastern">US/Eastern</option>
+              </select>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer pt-1"><input v-model="form.is_dst" type="checkbox"><span class="text-xs">Observes DST</span></label>
+          </div>
+        </div>
+
+        <!-- Specs -->
+        <div class="bg-blue-50 p-3 rounded border border-blue-100">
+          <label class="block text-xs font-bold uppercase text-blue-700 mb-2">Specs</label>
+          <div class="grid grid-cols-3 gap-2">
+            <div><span class="text-[10px] text-gray-400 block">Beds</span><input v-model="form.bedrooms" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Baths</span><input v-model="form.bathrooms" type="number" step="0.5" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Guests</span><input v-model="form.max_guests" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Sq Ft</span><input v-model="form.sq_ft" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Sinks</span><input v-model="form.sinks" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+            <div><span class="text-[10px] text-gray-400 block">Mats</span><input v-model="form.baths_mats" type="number" min="0" class="w-full border p-1 rounded text-sm"></div>
+          </div>
+        </div>
+
+        <!-- Amenities -->
+        <div class="bg-pink-50 p-3 rounded border border-pink-100">
+          <label class="block text-xs font-bold uppercase text-pink-700 mb-2">Amenities</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.has_pool" type="checkbox"><span class="text-xs">Has Pool</span></label>
+            <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.has_bbq" type="checkbox"><span class="text-xs">Has BBQ</span></label>
+            <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.allows_pets" type="checkbox"><span class="text-xs">Pets Allowed</span></label>
+            <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.has_casita" type="checkbox"><span class="text-xs">Has Casita</span></label>
+          </div>
+        </div>
       </div>
-      
-      <!-- Body -->
-      <div class="flex-1 overflow-auto p-6 bg-slate-50">
-        <form @submit.prevent="saveData" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <!-- COL 1 -->
-            <div class="space-y-6">
-                <!-- Photo -->
-                <div class="bg-white p-4 rounded-lg shadow-sm">
-                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2">Front Photo</label>
-                    <div class="mb-2">
-                        <img v-if="form.front_photo_url" :src="form.front_photo_url" class="w-full h-40 object-cover rounded border border-gray-200">
-                        <div v-else class="w-full h-40 bg-gray-50 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-400">
-                            No Photo
-                        </div>
-                    </div>
-                    <label class="cursor-pointer bg-blue-50 text-blue-600 px-3 py-2 rounded text-sm font-bold flex items-center justify-center hover:bg-blue-100 transition">
-                        <Upload size="16" class="mr-2" /> Upload Photo
-                        <input type="file" @change="handleFrontPhoto" class="hidden" accept="image/*">
-                    </label>
-                </div>
 
-                <!-- Specs -->
-                <div class="bg-white p-4 rounded-lg shadow-sm">
-                    <h3 class="text-xs font-bold uppercase text-gray-500 mb-3">Specs</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="text-[10px] text-gray-400 block">Beds</label><input v-model="form.bedrooms" type="number" class="w-full border p-1 rounded text-sm"></div>
-                        <div><label class="text-[10px] text-gray-400 block">Baths</label><input v-model="form.bathrooms" type="number" step="0.5" class="w-full border p-1 rounded text-sm"></div>
-                        <div><label class="text-[10px] text-gray-400 block">Guests</label><input v-model="form.max_guests" type="number" class="w-full border p-1 rounded text-sm"></div>
-                        <div><label class="text-[10px] text-gray-400 block">Sq Ft</label><input v-model="form.sq_ft" type="number" class="w-full border p-1 rounded text-sm"></div>
-                        <div><label class="text-[10px] text-gray-400 block">Sinks</label><input v-model="form.sinks" type="number" class="w-full border p-1 rounded text-sm"></div>
-                        <div><label class="text-[10px] text-gray-400 block">Mats</label><input v-model="form.baths_mats" type="number" class="w-full border p-1 rounded text-sm"></div>
-                    </div>
-                </div>
-
-                <!-- Amenities -->
-                <div class="bg-white p-4 rounded-lg shadow-sm">
-                    <h3 class="text-xs font-bold uppercase text-gray-500 mb-3">Amenities</h3>
-                    <div class="grid grid-cols-2 gap-2">
-                        <label class="flex items-center gap-2"><input v-model="form.has_pool" type="checkbox"><span class="text-sm">Pool</span></label>
-                        <label class="flex items-center gap-2"><input v-model="form.has_bbq" type="checkbox"><span class="text-sm">BBQ</span></label>
-                        <label class="flex items-center gap-2"><input v-model="form.allows_pets" type="checkbox"><span class="text-sm">Pets</span></label>
-                        <label class="flex items-center gap-2"><input v-model="form.has_casita" type="checkbox"><span class="text-sm">Casita</span></label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- COL 2 -->
-             <div class="space-y-6">
-                <!-- Basic Info -->
-                <div class="bg-white p-4 rounded-lg shadow-sm space-y-4">
-                    <h3 class="text-xs font-bold uppercase text-gray-500">Details</h3>
-                    <input v-model="form.name" class="w-full border p-2 rounded text-sm" placeholder="Property Name *">
-                    <input v-model="form.address" class="w-full border p-2 rounded text-sm" placeholder="Address">
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="text-[10px] text-gray-400 block">Check-in</label><input v-model="form.checkin" type="time" class="w-full border p-1 rounded text-sm"></div>
-                        <div><label class="text-[10px] text-gray-400 block">Check-out</label><input v-model="form.checkout" type="time" class="w-full border p-1 rounded text-sm"></div>
-                    </div>
-                    
-                    <div>
-                        <label class="text-[10px] text-gray-400 block">Time Zone</label>
-                        <select v-model="form.timezone" class="w-full border p-1 rounded text-sm bg-white">
-                            <option value="UTC">UTC</option>
-                            <option value="US/Pacific">US/Pacific</option>
-                            <option value="US/Mountain">US/Mountain</option>
-                            <option value="US/Arizona">US/Arizona</option>
-                            <option value="US/Central">US/Central</option>
-                            <option value="US/Eastern">US/Eastern</option>
-                        </select>
-                    </div>
-                    <label class="flex items-center gap-2"><input v-model="form.is_dst" type="checkbox"><span class="text-xs">Observes DST</span></label>
-                </div>
-
-                <!-- Access Codes -->
-                 <div class="bg-white p-4 rounded-lg shadow-sm">
-                    <h3 class="text-xs font-bold uppercase text-gray-500 mb-3">Access Codes & Wifi</h3>
-                    <div class="space-y-2">
-                         <div class="grid grid-cols-3 gap-2 items-center"><span class="text-xs text-gray-500">Door</span> <input v-model="form.door_code" class="col-span-2 border p-1 rounded text-sm font-mono"></div>
-                         <div class="grid grid-cols-3 gap-2 items-center"><span class="text-xs text-gray-500">Garage</span> <input v-model="form.garage_code" class="col-span-2 border p-1 rounded text-sm font-mono"></div>
-                         <div class="grid grid-cols-3 gap-2 items-center"><span class="text-xs text-gray-500">Gate</span> <input v-model="form.gate_code" class="col-span-2 border p-1 rounded text-sm font-mono"></div>
-                         <div class="grid grid-cols-3 gap-2 items-center"><span class="text-xs text-gray-500">Closet</span> <input v-model="form.closet_code" class="col-span-2 border p-1 rounded text-sm font-mono"></div>
-                         <div class="grid grid-cols-3 gap-2 items-center"><span class="text-xs text-purple-600 font-bold">Casita</span> <input v-model="form.casita_code" class="col-span-2 border p-1 rounded text-sm font-mono"></div>
-                         
-                         <div class="border-t my-2 pt-2"></div>
-                         <div class="grid grid-cols-3 gap-2 items-center"><span class="text-xs text-gray-500">Wifi</span> <input v-model="form.wifi_network" class="col-span-2 border p-1 rounded text-sm" placeholder="Network"></div>
-                         <div class="grid grid-cols-3 gap-2 items-center"><span class="text-xs text-gray-500">Pass</span> <input v-model="form.wifi_password" class="col-span-2 border p-1 rounded text-sm font-mono" placeholder="Password"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- COL 3 -->
-            <div class="space-y-6">
-                <!-- People -->
-                <div class="bg-white p-4 rounded-lg shadow-sm">
-                    <h3 class="text-xs font-bold uppercase text-gray-500 mb-3">People</h3>
-                    <div class="space-y-4">
-                        <div>
-                            <span class="text-xs font-bold block mb-1">Owner(s) <span class="text-red-500">*</span></span>
-                            <div class="h-24 overflow-y-auto border rounded p-2 text-sm bg-gray-50">
-                                <label v-for="p in people" :key="p.id" class="flex items-center gap-2 mb-1">
-                                    <input type="checkbox" :value="p.id" v-model="form.owner_ids"> 
-                                    {{ p.first_name }} {{ p.last_name }}
-                                </label>
-                            </div>
-                        </div>
-                        <div>
-                            <span class="text-xs font-bold block mb-1">Manager(s) <span class="text-red-500">*</span></span>
-                            <div class="h-24 overflow-y-auto border rounded p-2 text-sm bg-gray-50">
-                                <label v-for="p in people" :key="p.id" class="flex items-center gap-2 mb-1">
-                                    <input type="checkbox" :value="p.id" v-model="form.manager_ids"> 
-                                    {{ p.first_name }} {{ p.last_name }}
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Inventory -->
-                <div class="bg-white p-4 rounded-lg shadow-sm">
-                    <h3 class="text-xs font-bold uppercase text-gray-500 mb-3">Inventory (BOM)</h3>
-                    <div class="flex gap-2 mb-2">
-                        <select v-model="selectedTemplateId" class="border p-1 rounded text-xs flex-1">
-                            <option value="">Select Template...</option>
-                            <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
-                        </select>
-                        <button type="button" @click="applyTemplate" class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">Add</button>
-                    </div>
-                    <div class="max-h-32 overflow-y-auto border rounded bg-gray-50 p-2 space-y-1">
-                        <div v-for="(item, idx) in inventory" :key="idx" class="flex justify-between items-center text-xs border-b pb-1 last:border-0">
-                            <span class="truncate">{{ item.name }}</span>
-                            <div class="flex items-center gap-1">
-                                <span class="font-bold">{{ item.qty }}</span>
-                                <button type="button" @click="inventory.splice(idx, 1)" class="text-red-400"><X size="12" /></button>
-                            </div>
-                        </div>
-                        <div v-if="!inventory.length" class="text-center text-gray-400 text-xs italic">No items</div>
-                    </div>
-                </div>
-                
-                <!-- Integrations -->
-                <div class="bg-white p-4 rounded-lg shadow-sm">
-                     <h3 class="text-xs font-bold uppercase text-gray-500 mb-3">Integrations</h3>
-                     <div class="grid grid-cols-2 gap-2">
-                         <div><label class="text-[10px] text-gray-400 block">HCP Customer ID</label><input v-model="form.hcp_cust" class="w-full border p-1 rounded text-sm"></div>
-                         <div><label class="text-[10px] text-gray-400 block">HCP Addr ID</label><input v-model="form.hcp_addr" class="w-full border p-1 rounded text-sm"></div>
-                     </div>
-                </div>
-            </div>
-
-        </form>
-      </div>
-      
-      <!-- Footer -->
-      <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-        <button v-if="property" @click="handleDelete" class="text-red-500 text-sm flex items-center gap-2 hover:bg-red-50 px-3 py-2 rounded">
-             <Trash2 size="16"/> Archive
-        </button>
-        <div v-else></div> <!-- Spacer -->
+      <!-- RIGHT COLUMN (2/3) -->
+      <div class="w-full md:w-2/3 space-y-4">
+        <!-- Title -->
+        <div class="flex justify-between items-center">
+          <h3 class="font-bold text-lg text-slate-900">{{ property ? 'Edit Property' : 'New Property' }}</h3>
+          <span v-if="property?.status === 'archived'" class="bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold uppercase">Archived</span>
+        </div>
         
+        <!-- Name -->
+        <input v-model="form.name" class="w-full border p-2 rounded" placeholder="Property Name">
         
-        <div class="flex gap-4">
-             <button @click="handleClose" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded text-sm font-bold">Cancel</button>
-             <button @click="saveData" :disabled="saving" class="px-6 py-2 bg-slate-900 text-white rounded shadow text-sm font-bold hover:bg-slate-700 flex items-center">
-                 <Save size="16" class="mr-2" />
-                 {{ saving ? 'Saving...' : 'Save Property' }}
-             </button>
+        <!-- Address with Autocomplete -->
+        <div class="flex gap-2">
+          <select class="border p-2 rounded bg-white text-sm"><option value="us">🇺🇸</option><option value="ca">🇨🇦</option></select>
+          <div class="relative flex-1">
+            <input 
+              v-model="form.address" 
+              @input="onAddressInput" 
+              @blur="hideAddressSuggestions"
+              class="w-full border p-2 rounded" 
+              placeholder="Full Address"
+              autocomplete="off"
+            >
+            <div v-if="showAddressSuggestions && addressSuggestions.length > 0" class="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+              <div v-for="(addr, idx) in addressSuggestions" :key="idx" @mousedown="selectAddress(addr)" class="p-2 hover:bg-blue-50 cursor-pointer text-xs border-b border-gray-50 last:border-0">
+                {{ addr }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parking -->
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Parking Instructions</label>
+          <textarea v-model="form.parking" class="w-full border p-2 rounded text-sm h-20 resize-none" placeholder="Enter parking details..."></textarea>
+        </div>
+
+        <!-- Access Codes -->
+        <div class="bg-yellow-50 p-4 rounded border border-yellow-100">
+          <label class="block text-xs font-bold uppercase text-yellow-700 mb-3">Access Codes</label>
+          <div class="grid grid-cols-2 gap-4">
+            <div><span class="text-[10px] uppercase text-gray-500 font-bold">Front Door</span><input v-model="form.door_code" class="w-full border p-2 rounded text-sm font-mono bg-white"></div>
+            <div><span class="text-[10px] uppercase text-gray-500 font-bold">Garage</span><input v-model="form.garage_code" class="w-full border p-2 rounded text-sm font-mono bg-white"></div>
+            <div><span class="text-[10px] uppercase text-gray-500 font-bold">Comm. Gate</span><input v-model="form.gate_code" class="w-full border p-2 rounded text-sm font-mono bg-white"></div>
+            <div><span class="text-[10px] uppercase text-gray-500 font-bold">Owner Closet</span><input v-model="form.closet_code" class="w-full border p-2 rounded text-sm font-mono bg-white"></div>
+            <div><span class="text-[10px] uppercase text-gray-500 font-bold text-purple-600">Casita Code</span><input v-model="form.casita_code" class="w-full border p-2 rounded text-sm font-mono bg-white"></div>
+          </div>
+        </div>
+
+        <!-- Wifi -->
+        <div class="bg-indigo-50 p-4 rounded border border-indigo-100">
+          <label class="block text-xs font-bold uppercase text-indigo-700 mb-3">Wifi Details</label>
+          <div class="grid grid-cols-2 gap-4">
+            <div><span class="text-[10px] uppercase text-gray-500 font-bold">Network Name</span><input v-model="form.wifi_network" class="w-full border p-2 rounded text-sm bg-white"></div>
+            <div><span class="text-[10px] uppercase text-gray-500 font-bold">Password</span><input v-model="form.wifi_password" class="w-full border p-2 rounded text-sm bg-white"></div>
+          </div>
+        </div>
+
+        <!-- Inventory -->
+        <div class="bg-green-50 p-4 rounded border border-green-100">
+          <div class="flex justify-between items-center mb-3">
+            <label class="block text-xs font-bold uppercase text-green-700">Inventory (BOM)</label>
+            <div class="flex gap-2">
+              <select v-model="selectedTemplateId" class="border border-green-200 p-1 rounded text-xs bg-white w-32">
+                <option value="">Apply Template...</option>
+                <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+              </select>
+              <button type="button" @click="applyTemplate" class="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-green-700">Add</button>
+            </div>
+          </div>
+          <div class="flex gap-2 mb-2">
+            <input v-model="singleItemName" list="catalog-list" class="flex-1 border p-1 rounded text-xs" placeholder="Search Master Catalog...">
+            <datalist id="catalog-list"><option v-for="c in catalog" :key="c.id" :value="c.item_name">{{ c.category }}</option></datalist>
+            <input v-model.number="singleItemQty" type="number" class="w-12 border p-1 rounded text-xs text-center" value="1">
+            <button type="button" @click="addInventoryItem" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 rounded"><Plus size="12" /></button>
+          </div>
+          <div class="bg-white border border-green-100 rounded p-2 max-h-40 overflow-y-auto space-y-1">
+            <div v-for="(item, idx) in inventory" :key="idx" class="flex justify-between items-center border-b border-gray-50 pb-1 last:border-0">
+              <div class="flex items-center gap-2">
+                <input type="number" v-model="item.qty" class="w-10 text-center border rounded text-xs p-0.5 font-bold bg-gray-50">
+                <span class="text-xs font-medium text-slate-700">{{ item.name }}</span>
+                <span class="text-[10px] text-gray-400 bg-gray-50 px-1 rounded">{{ item.category || '' }}</span>
+              </div>
+              <button type="button" @click="inventory.splice(idx, 1)" class="text-red-400 hover:text-red-600 p-1"><X size="12" /></button>
+            </div>
+            <div v-if="!inventory.length" class="text-center text-gray-400 text-xs py-2">No inventory items.</div>
+          </div>
+        </div>
+
+        <!-- Calendar Feeds -->
+        <div class="bg-blue-50 p-4 rounded border border-blue-100">
+          <label class="block text-xs font-bold uppercase text-blue-700 mb-3">Calendar Sync (iCal)</label>
+          <div class="space-y-2">
+            <div v-for="(feed, idx) in feeds" :key="idx" class="flex gap-2 items-center">
+              <select v-model="feed.name" class="border p-2 rounded text-xs bg-white w-32">
+                <option v-for="t in ['Airbnb', 'VRBO', 'Booking.com', 'Guesty', 'HomeAway', 'Hospitable', 'HostTools', 'Lodgify', 'OwnerRez']" :key="t" :value="t">{{ t }}</option>
+              </select>
+              <input v-model="feed.url" class="flex-1 border p-2 rounded text-xs" placeholder="https://...">
+              <button type="button" @click="feeds.splice(idx, 1)" class="text-red-400 hover:text-red-600 p-1"><Trash2 size="14" /></button>
+            </div>
+          </div>
+          <button type="button" @click="addFeed" class="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+            <Plus size="12" /> Add Feed
+          </button>
+        </div>
+
+        <!-- People -->
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Owner(s) <span class="text-red-500">*</span></label>
+            <div class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1">
+              <label v-for="p in people" :key="p.id" class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                <input type="checkbox" :value="p.id" v-model="form.owner_ids">
+                <span class="text-xs">{{ p.first_name }} {{ p.last_name }}</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property Manager(s) <span class="text-red-500">*</span></label>
+            <div class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1">
+              <label v-for="p in people" :key="p.id" class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                <input type="checkbox" :value="p.id" v-model="form.manager_ids">
+                <span class="text-xs">{{ p.first_name }} {{ p.last_name }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- HCP IDs -->
+        <div class="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-500 mb-1">HCP Customer ID</label>
+            <input v-model="form.hcp_cust" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 12345">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-500 mb-1">HCP Address ID</label>
+            <input v-model="form.hcp_addr" class="w-full border p-2 rounded text-xs text-gray-700" placeholder="e.g. 67890">
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-between pt-4 mt-2 border-t border-gray-100">
+          <button v-if="property" type="button" @click="handleDelete" class="text-red-500 hover:text-red-700 font-bold text-sm px-2">Archive Property</button>
+          <div v-else></div>
+          <div class="flex gap-2">
+            <button type="button" @click="handleClose" class="px-4 py-2 text-sm hover:bg-gray-100 rounded">Cancel</button>
+            <button type="button" @click="saveData" :disabled="saving" class="bg-black text-white px-6 py-2 rounded text-sm font-bold hover:bg-gray-800">
+              {{ saving ? 'Saving...' : 'Save Property' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

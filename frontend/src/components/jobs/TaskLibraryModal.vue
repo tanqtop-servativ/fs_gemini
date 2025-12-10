@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../composables/useAuth'
 import { X, Search, Plus, Book, Check } from 'lucide-vue-next'
@@ -96,6 +96,21 @@ watch([tasks, searchQuery], () => {
         t.title.toLowerCase().includes(q) || 
         (t.title_es && t.title_es.toLowerCase().includes(q))
     )
+})
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

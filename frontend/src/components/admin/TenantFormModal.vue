@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { useTenants } from '../../composables/useTenants'
 import { X, Check } from 'lucide-vue-next'
 
@@ -72,6 +72,21 @@ watch(() => props.isOpen, (open) => {
         resetForm()
         initialState.value = getSnapshot()
     }
+})
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    handleClose()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

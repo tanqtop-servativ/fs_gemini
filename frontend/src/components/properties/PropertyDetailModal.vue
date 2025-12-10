@@ -1,10 +1,10 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useProperties } from '../../composables/useProperties'
 import AuditHistory from '../AuditHistory.vue'
 import { 
   X, Pencil, Image as ImageIcon, FileText, 
-  MapPin, Check, Wifi, Key, ExternalLink 
+  MapPin, Check, Wifi, Key, Home, Calendar, Clock, Archive
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -62,6 +62,21 @@ const mapLink = computed(() => `https://maps.google.com/?q=${encodeURIComponent(
 
 // Use propertyDetail for display, fallback to props.property for basic info
 const prop = computed(() => propertyDetail.value || props.property || {})
+
+// ESC Key Handler
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
