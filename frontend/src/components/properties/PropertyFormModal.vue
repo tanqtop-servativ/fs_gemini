@@ -460,7 +460,7 @@ onUnmounted(() => {
           <!-- City, State, Zip -->
           <div class="grid grid-cols-6 gap-2">
             <input v-model="form.city" class="col-span-3 border p-2 rounded" placeholder="City">
-            <input v-model="form.state" class="col-span-1 border p-2 rounded uppercase" placeholder="State" maxlength="2">
+            <input v-model="form.state" class="col-span-1 border p-2 rounded" placeholder="State" maxlength="2">
             <input v-model="form.zip" class="col-span-2 border p-2 rounded" placeholder="Zip Code" maxlength="10">
           </div>
         </div>
