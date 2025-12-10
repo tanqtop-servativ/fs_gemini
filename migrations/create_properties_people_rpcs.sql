@@ -135,10 +135,8 @@ BEGIN
             ), '[]'::jsonb)
             FROM property_attachments a WHERE a.property_id = p_property_id
         ),
-        'owners', (
-            SELECT COALESCE(jsonb_agg(
-        owners := json_property_people(p_property_id, 'Owner'),
-        managers := json_property_people(p_property_id, 'Property Manager')
+        'owners', json_property_people(p_property_id, 'Owner'),
+        'managers', json_property_people(p_property_id, 'Property Manager')
     );
     
     RETURN result;
