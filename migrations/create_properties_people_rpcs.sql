@@ -19,7 +19,7 @@ BEGIN
         p.id,
         p.tenant_id,
         p.name,
-        p.address,
+        p.street_address,
         p.city,
         p.state,
         p.zip,

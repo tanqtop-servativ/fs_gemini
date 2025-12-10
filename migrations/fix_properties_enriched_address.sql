@@ -12,7 +12,7 @@ SELECT
     p.name,
     p.hcp_customer_id,
     p.hcp_address_id,
-    p.address AS display_address, -- Use raw address without concatenation
+    p.display_address, -- Now uses generated column
     p.check_in_time,
     p.check_out_time,
     p.time_zone,

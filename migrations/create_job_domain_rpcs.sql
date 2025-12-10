@@ -25,7 +25,7 @@ BEGIN
         j.created_at,
         p.id as property_id,
         p.name as property_name,
-        p.address as property_address,
+        p.display_address as property_address,
         p.front_photo_url as property_photo,
         so.id as opportunity_id,
         so.title as opportunity_title

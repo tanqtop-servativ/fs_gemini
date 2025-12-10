@@ -25,7 +25,7 @@ BEGIN
         so.created_at,
         p.id as property_id,
         p.name as property_name,
-        p.address as property_address,
+        p.display_address as property_address,
         st.id as template_id,
         st.name as template_name
     INTO opp_record
