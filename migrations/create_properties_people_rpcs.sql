@@ -137,28 +137,8 @@ BEGIN
         ),
         'owners', (
             SELECT COALESCE(jsonb_agg(
-                jsonb_build_object(
-                    'id', pe.id,
-                    'name', TRIM(COALESCE(pe.first_name, '') || ' ' || COALESCE(pe.last_name, ''))
-                )
-            ), '[]'::jsonb)
-            FROM property_assignments pa
-            JOIN people pe ON pe.id = pa.person_id
-            JOIN roles r ON r.id = pa.role_id
-            WHERE pa.property_id = p_property_id AND r.name = 'Owner'
-        ),
-        'managers', (
-            SELECT COALESCE(jsonb_agg(
-                jsonb_build_object(
-                    'id', pe.id,
-                    'name', TRIM(COALESCE(pe.first_name, '') || ' ' || COALESCE(pe.last_name, ''))
-                )
-            ), '[]'::jsonb)
-            FROM property_assignments pa
-            JOIN people pe ON pe.id = pa.person_id
-            JOIN roles r ON r.id = pa.role_id
-            WHERE pa.property_id = p_property_id AND r.name = 'Property Manager'
-        )
+        owners := json_property_people(p_property_id, 'Owner'),
+        managers := json_property_people(p_property_id, 'Property Manager')
     );
     
     RETURN result;
