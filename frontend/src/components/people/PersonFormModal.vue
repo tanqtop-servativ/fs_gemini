@@ -180,7 +180,7 @@ onUnmounted(() => {
 
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
             <h3 class="font-bold text-lg text-slate-900">{{ person ? 'Edit Person' : 'New Person' }}</h3>
             <button @click="handleClose" class="text-gray-400 hover:text-black"><X size="20" /></button>
@@ -228,7 +228,7 @@ onUnmounted(() => {
             </div>
             <div>
                  <label class="text-xs font-bold text-gray-500 uppercase mb-2 block">Assign Roles</label>
-                 <div class="max-h-32 overflow-y-auto border border-gray-100 rounded p-2 bg-slate-50 grid grid-cols-2 gap-2">
+                 <div class="max-h-32 overflow-y-auto border border-gray-100 rounded p-2 bg-slate-50 grid grid-cols-3 gap-2">
                      <label v-for="role in roles" :key="role.id" class="flex items-center gap-2 text-sm cursor-pointer hover:bg-white p-1 rounded">
                          <input type="checkbox" :value="role.id" v-model="form.role_ids" class="rounded border-gray-300 text-blue-600 focus:ring-0">
                          {{ role.name }}
