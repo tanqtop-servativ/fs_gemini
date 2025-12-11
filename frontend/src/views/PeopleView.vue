@@ -12,8 +12,10 @@ import SortableHeader from '../components/SortableHeader.vue'
 const router = useRouter()
 const route = useRoute()
 const people = ref([])
+const roles = ref([])
 const loading = ref(true)
 const showArchived = ref(false)
+const selectedRole = ref('')  // Empty = all roles
 
 // Modals
 const showDetail = ref(false)
@@ -35,7 +37,17 @@ const handleSort = (col) => {
 }
 
 const sortedPeople = computed(() => {
-  return [...people.value].sort((a, b) => {
+  // First filter by role
+  let filtered = people.value
+  if (selectedRole.value) {
+    filtered = filtered.filter(p => {
+      const personRoles = (p.roles_display || '').split(', ').map(r => r.trim())
+      return personRoles.includes(selectedRole.value)
+    })
+  }
+  
+  // Then sort
+  return [...filtered].sort((a, b) => {
     let aVal = a[sortKey.value] || ''
     let bVal = b[sortKey.value] || ''
     
@@ -69,6 +81,10 @@ const fetchData = async () => {
     if (!tenantId) return 
 
     loading.value = true
+
+    // Fetch roles for filter dropdown
+    const { data: rolesData } = await supabase.from('roles').select('id, name').order('name')
+    roles.value = rolesData || []
 
     let query = supabase.from('people_enriched').select('*').order('last_name')
     if (tenantId) query = query.eq('tenant_id', tenantId)
@@ -145,6 +161,14 @@ const handleRestore = async (p) => {
           <input type="checkbox" v-model="showArchived" class="rounded border-gray-300 text-black focus:ring-0">
           Show Archived
         </label>
+        
+        <select 
+          v-model="selectedRole" 
+          class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+        >
+          <option value="">All Roles</option>
+          <option v-for="r in roles" :key="r.id" :value="r.name">{{ r.name }}</option>
+        </select>
         
         <button 
           @click="showRoles = true"
