@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
 import AuditHistory from '../AuditHistory.vue'
-import { supabase } from '../../lib/supabase'
+import { useServiceTemplates } from '../../composables/useServiceTemplates'
 import { X, Pencil, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -11,6 +11,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'edit', 'refresh'])
 
+const { deleteTemplate } = useServiceTemplates()
+
 const steps = computed(() => {
     if (!props.template || !props.template.service_workflow_steps) return []
     return props.template.service_workflow_steps.sort((a, b) => a.sort_order - b.sort_order)
@@ -18,8 +20,8 @@ const steps = computed(() => {
 
 const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this service template?")) return
-    const { error } = await supabase.from('service_templates').update({ deleted_at: new Date().toISOString() }).eq('id', props.template.id)
-    if (error) alert("Error: " + error.message)
+    const result = await deleteTemplate(props.template.id)
+    if (!result.success) alert("Error: " + result.error)
     else {
         emit('refresh')
         emit('close')
