@@ -235,8 +235,8 @@ onUnmounted(() => {
                            {{ role.name }}
                        </label>
                    </div>
-                   <!-- Fade gradient to indicate more content -->
-                   <div v-if="roles.length > 6" class="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none rounded-b"></div>
+                   <!-- Scroll hint to indicate more content -->
+                   <div v-if="roles.length > 6" class="text-center text-xs text-gray-400 mt-1">↓ Scroll for more roles</div>
                  </div>
             </div>
 
