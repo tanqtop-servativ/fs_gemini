@@ -345,7 +345,6 @@ const handleContextMenu = (e, item) => {
              <!-- Property -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900">{{ item.properties?.name || 'Unknown' }}</div>
-                 <div class="text-xs text-slate-500">{{ item.due_date ? 'Due ' + new Date(item.due_date).toLocaleDateString() : 'No Due Date' }}</div>
              </td>
              <!-- Service -->
              <td class="px-6 py-4">

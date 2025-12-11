@@ -14,6 +14,7 @@ import { useAuth } from '../composables/useAuth'
 import { useCalendar } from '../composables/useCalendar'
 import CalendarEventModal from '../components/calendar/CalendarEventModal.vue'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
+import JobDetailModal from '../components/jobs/JobDetailModal.vue'
 import { perfLog } from '../lib/perfLog'
 import { useDebugLifecycle } from '../composables/useDebugLifecycle'
 
@@ -32,6 +33,8 @@ const showEventModal = ref(false)
 const selectedEvent = ref(null)
 const showServiceOpportunityModal = ref(false)
 const newOpportunityDate = ref(null)
+const showJobModal = ref(false)
+const selectedJobId = ref(null)
 
 // Context menu state
 const router = useRouter()
@@ -187,6 +190,17 @@ const calendarOptions = {
     }
   },
   eventClick: (info) => {
+    const eventType = info.event.extendedProps?.event_type
+    const jobId = info.event.extendedProps?.job_id
+    
+    // For Job events, open job detail modal
+    if (eventType === 'Job' && jobId) {
+      selectedJobId.value = jobId
+      showJobModal.value = true
+      return
+    }
+    
+    // For other events (Bookings), show the event modal
     selectedEvent.value = info.event
     showEventModal.value = true
   },
@@ -382,6 +396,13 @@ const pageTitle = computed(() => {
       :defaultPropertyId="selectedPropId !== 'all' ? selectedPropId : null"
       @close="showServiceOpportunityModal = false; newOpportunityDate = null"
       @saved="handleOpportunitySaved"
+    />
+
+    <!-- Job Detail Modal -->
+    <JobDetailModal
+      :isOpen="showJobModal"
+      :jobId="selectedJobId"
+      @close="showJobModal = false; selectedJobId = null"
     />
 
     <!-- Context Menu -->

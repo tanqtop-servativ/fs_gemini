@@ -12,12 +12,14 @@ export function useVisits() {
      * Create a new visit for a job
      * @param {string} jobId
      * @param {string} [scheduledStart] - ISO timestamp
+     * @param {string} [scheduledEnd] - ISO timestamp
      * @returns {Promise<{success: boolean, visitId?: string, error?: string}>}
      */
-    const createVisit = async (jobId, scheduledStart = null) => {
+    const createVisit = async (jobId, scheduledStart = null, scheduledEnd = null) => {
         const { data, error } = await supabase.rpc('create_visit', {
             p_job_id: jobId,
-            p_scheduled_start: scheduledStart
+            p_scheduled_start: scheduledStart,
+            p_scheduled_end: scheduledEnd
         })
 
         if (error) {

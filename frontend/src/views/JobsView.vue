@@ -353,9 +353,6 @@ const softDeleteJob = async () => {
              <!-- Service Opportunity -->
              <td class="px-6 py-4">
                  <div class="text-sm text-slate-600">{{ item.service_opportunities?.title || '—' }}</div>
-                 <div v-if="item.service_opportunities?.due_date" class="text-xs text-gray-400">
-                     Due {{ new Date(item.service_opportunities.due_date).toLocaleDateString() }}
-                 </div>
              </td>
              <!-- Status -->
              <td class="px-6 py-4">

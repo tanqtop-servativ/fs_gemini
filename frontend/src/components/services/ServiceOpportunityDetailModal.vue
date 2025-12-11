@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { useServiceOpportunities } from '../../composables/useServiceOpportunities'
 import { useVisits } from '../../composables/useVisits'
 import AuditHistory from '../AuditHistory.vue'
-import { X, Play, AlertTriangle, CheckCircle2, Circle, ArrowRight, Pencil, CheckSquare, Square, Zap, Ban, Clock, Check, Calendar } from 'lucide-vue-next'
+import PropertyDetailModal from '../properties/PropertyDetailModal.vue'
+import { X, Play, AlertTriangle, CheckCircle2, Circle, ArrowRight, Pencil, CheckSquare, Square, Zap, Ban, Clock, Check, Calendar, ExternalLink } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -29,6 +30,13 @@ const generating = ref(false)
 const isSnoozing = ref(false)
 const snoozeUntilDate = ref('')
 
+// Property Detail Modal State
+const showPropertyModal = ref(false)
+
+const openPropertyDetail = () => {
+    showPropertyModal.value = true
+}
+
 const fetchJobs = async () => {
     if (!props.opportunity) return
     loadingJobs.value = true
@@ -38,7 +46,7 @@ const fetchJobs = async () => {
         .select(`
             *,
             job_tasks (id, title, is_completed),
-            visits (id, scheduled_start, status)
+            visits (id, scheduled_start, scheduled_end, status)
         `)
         .eq('service_opportunity_id', props.opportunity.id)
         .order('id', { ascending: true })
@@ -49,37 +57,80 @@ const fetchJobs = async () => {
 
 // Scheduling state
 const schedulingJobId = ref(null)
-const scheduleDate = ref('')
+const scheduleStartDate = ref('')
+const scheduleEndDate = ref('')
+
+// Computed duration for display during scheduling
+const scheduleDuration = computed(() => {
+    if (!scheduleStartDate.value || !scheduleEndDate.value) return null
+    
+    const start = new Date(scheduleStartDate.value)
+    const end = new Date(scheduleEndDate.value)
+    
+    if (end <= start) return null
+    
+    const diffMs = end - start
+    const diffMins = Math.round(diffMs / 60000)
+    const hours = Math.floor(diffMins / 60)
+    const mins = diffMins % 60
+    
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`
+    if (hours > 0) return `${hours}h`
+    return `${mins}m`
+})
+
+// Auto-update end time when start time changes (default: 15 minutes later)
+watch(scheduleStartDate, (newStart) => {
+    if (!newStart) return
+    
+    const start = new Date(newStart)
+    const end = new Date(start.getTime() + 15 * 60000) // 15 minutes later
+    
+    // Format for datetime-local input
+    const offset = end.getTimezoneOffset() * 60000
+    const localEnd = new Date(end.getTime() - offset)
+    scheduleEndDate.value = localEnd.toISOString().slice(0, 16)
+})
 
 const startScheduling = (jobId) => {
     schedulingJobId.value = jobId
-    // Default to tomorrow 9am
+    // Default to tomorrow 9am - 10am (1 hour)
     const d = new Date()
     d.setDate(d.getDate() + 1)
     d.setHours(9, 0, 0, 0)
     const offset = d.getTimezoneOffset() * 60000
-    const localDate = new Date(d.getTime() - offset)
-    scheduleDate.value = localDate.toISOString().slice(0, 16)
+    const localStart = new Date(d.getTime() - offset)
+    scheduleStartDate.value = localStart.toISOString().slice(0, 16)
+    
+    // Default end time: 1 hour later
+    d.setHours(10, 0, 0, 0)
+    const localEnd = new Date(d.getTime() - offset)
+    scheduleEndDate.value = localEnd.toISOString().slice(0, 16)
 }
 
 const cancelScheduling = () => {
     schedulingJobId.value = null
-    scheduleDate.value = ''
+    scheduleStartDate.value = ''
+    scheduleEndDate.value = ''
 }
 
 const confirmSchedule = async (jobId) => {
-    if (!scheduleDate.value) {
-        alert('Please select a date and time')
+    if (!scheduleStartDate.value) {
+        alert('Please select a start time')
         return
     }
     
-    const result = await createVisit(jobId, new Date(scheduleDate.value).toISOString())
+    const startIso = new Date(scheduleStartDate.value).toISOString()
+    const endIso = scheduleEndDate.value ? new Date(scheduleEndDate.value).toISOString() : null
+    
+    const result = await createVisit(jobId, startIso, endIso)
     
     if (!result.success) {
         alert('Error scheduling: ' + result.error)
     } else {
         schedulingJobId.value = null
-        scheduleDate.value = ''
+        scheduleStartDate.value = ''
+        scheduleEndDate.value = ''
         await fetchJobs() // Refresh to show new schedule
     }
 }
@@ -88,18 +139,40 @@ const getJobSchedule = (job) => {
     if (!job.visits || job.visits.length === 0) return null
     // Get the first scheduled visit
     const scheduled = job.visits.find(v => v.scheduled_start)
-    return scheduled?.scheduled_start
+    if (!scheduled) return null
+    return {
+        start: scheduled.scheduled_start,
+        end: scheduled.scheduled_end
+    }
 }
 
-const formatSchedule = (isoDate) => {
-    if (!isoDate) return ''
-    return new Date(isoDate).toLocaleString(undefined, {
+const formatSchedule = (schedule) => {
+    if (!schedule || !schedule.start) return ''
+    const start = new Date(schedule.start)
+    const startStr = start.toLocaleString(undefined, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit'
     })
+    
+    if (!schedule.end) return startStr
+    
+    const end = new Date(schedule.end)
+    const endStr = end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    
+    // Calculate duration
+    const diffMs = end - start
+    const diffMins = Math.round(diffMs / 60000)
+    const hours = Math.floor(diffMins / 60)
+    const mins = diffMins % 60
+    let durationStr = ''
+    if (hours > 0 && mins > 0) durationStr = `${hours}h ${mins}m`
+    else if (hours > 0) durationStr = `${hours}h`
+    else durationStr = `${mins}m`
+    
+    return `${startStr} - ${endStr} (${durationStr})`
 }
 
 watch(() => props.isOpen, (open) => {
@@ -316,7 +389,17 @@ onUnmounted(() => {
             <!-- Info Card -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-2 gap-4">
                  <div>
-                     <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Property</label>
+                     <label class="flex items-center gap-1 text-xs font-bold uppercase text-gray-400 mb-1">
+                         Property
+                         <button 
+                             v-if="opportunity.property_id"
+                             @click="openPropertyDetail"
+                             class="p-0.5 text-gray-400 hover:text-blue-600 rounded transition"
+                             title="View Property Details"
+                         >
+                             <ExternalLink size="12" />
+                         </button>
+                     </label>
                      <div class="font-bold text-slate-800">{{ opportunity.properties?.name || 'Unknown' }}</div>
                  </div>
                  <div>
@@ -326,10 +409,6 @@ onUnmounted(() => {
                  <div>
                      <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Source</label>
                      <div class="text-sm text-slate-600">{{ opportunity.trigger_source || 'Manual' }}</div>
-                 </div>
-                 <div>
-                     <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Due Date</label>
-                     <div class="text-sm text-slate-600">{{ opportunity.due_date ? new Date(opportunity.due_date).toLocaleDateString() : 'None' }}</div>
                  </div>
             </div>
 
@@ -386,18 +465,37 @@ onUnmounted(() => {
                                      <Calendar size="14" class="text-blue-500" />
                                      <span class="font-medium">{{ formatSchedule(getJobSchedule(job)) }}</span>
                                  </div>
-                                 <div v-else-if="schedulingJobId === job.id" class="flex items-center gap-2 animate-in slide-in-from-top-1">
-                                     <input 
-                                         type="datetime-local" 
-                                         v-model="scheduleDate"
-                                         class="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
-                                     />
-                                     <button @click="confirmSchedule(job.id)" class="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
-                                         <Check size="14" />
-                                     </button>
-                                     <button @click="cancelScheduling" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition">
-                                         <X size="14" />
-                                     </button>
+                                 <div v-else-if="schedulingJobId === job.id" class="flex flex-wrap items-center gap-2 animate-in slide-in-from-top-1">
+                                     <div class="flex items-center gap-1">
+                                         <span class="text-xs text-gray-500 font-medium">Start:</span>
+                                         <input 
+                                             type="datetime-local" 
+                                             v-model="scheduleStartDate"
+                                             class="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
+                                         />
+                                     </div>
+                                     <div class="flex items-center gap-1">
+                                         <span class="text-xs text-gray-500 font-medium">End:</span>
+                                         <input 
+                                             type="datetime-local" 
+                                             v-model="scheduleEndDate"
+                                             class="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
+                                         />
+                                     </div>
+                                     <span v-if="scheduleDuration" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                         {{ scheduleDuration }}
+                                     </span>
+                                     <span v-else-if="scheduleStartDate && scheduleEndDate" class="text-xs text-red-500">
+                                         Invalid duration
+                                     </span>
+                                     <div class="flex items-center gap-1">
+                                         <button @click="confirmSchedule(job.id)" class="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition" title="Confirm">
+                                             <Check size="14" />
+                                         </button>
+                                         <button @click="cancelScheduling" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition" title="Cancel">
+                                             <X size="14" />
+                                         </button>
+                                     </div>
                                  </div>
                                  <button 
                                      v-else
@@ -452,5 +550,11 @@ onUnmounted(() => {
 
     </div>
   </div>
+
+  <!-- Property Detail Modal (nested) -->
+  <PropertyDetailModal 
+      :is-open="showPropertyModal" 
+      :property="{ id: opportunity?.property_id, name: opportunity?.properties?.name }"
+      @close="showPropertyModal = false"
+  />
 </template>
-```

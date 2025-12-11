@@ -75,7 +75,8 @@ export function useCalendar() {
                 property_name: evt.property_name,
                 property_address: evt.property_address,
                 event_type: evt.event_type,
-                code: evt.code
+                code: evt.code,
+                job_id: evt.job_id  // For navigation to job detail
             }
         }))
 
