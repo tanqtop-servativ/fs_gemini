@@ -7,6 +7,7 @@ import PersonDetailModal from '../components/people/PersonDetailModal.vue'
 import PersonFormModal from '../components/people/PersonFormModal.vue'
 import RolesManagerModal from '../components/people/RolesManagerModal.vue'
 import SortableHeader from '../components/SortableHeader.vue'
+import TableSearch from '../components/TableSearch.vue'
 
 // State
 const router = useRouter()
@@ -17,6 +18,7 @@ const loading = ref(true)
 const showArchived = ref(false)
 const selectedRoles = ref([])  // Array of role names
 const showRoleFilter = ref(false)
+const searchQuery = ref('')
 
 // Modals
 const showDetail = ref(false)
@@ -44,6 +46,17 @@ const sortedPeople = computed(() => {
     filtered = filtered.filter(p => {
       const personRoles = (p.roles_display || '').split(', ').map(r => r.trim())
       return selectedRoles.value.some(role => personRoles.includes(role))
+    })
+  }
+  
+  // Then filter by search query
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(p => {
+      const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase()
+      const email = (p.email || '').toLowerCase()
+      const roles = (p.roles_display || '').toLowerCase()
+      return fullName.includes(q) || email.includes(q) || roles.includes(q)
     })
   }
   
@@ -170,6 +183,11 @@ const handleRestore = async (p) => {
       </div>
       
       <div class="flex items-center gap-4">
+        <TableSearch 
+          v-model="searchQuery" 
+          placeholder="Search people..."
+        />
+        
         <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
           <input type="checkbox" v-model="showArchived" class="rounded border-gray-300 text-black focus:ring-0">
           Show Archived
