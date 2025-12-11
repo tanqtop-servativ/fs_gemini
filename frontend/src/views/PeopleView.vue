@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { supabase } from '../lib/supabase'
+import { usePeople } from '../composables/usePeople'
 import { Plus, Eye, Mail, Shield, UserCircle } from 'lucide-vue-next'
 import PersonDetailModal from '../components/people/PersonDetailModal.vue'
 import PersonFormModal from '../components/people/PersonFormModal.vue'
@@ -96,6 +96,7 @@ const roleCount = computed(() => {
 import { useAuth } from '../composables/useAuth'
 
 const { userProfile, user, isTenantAdmin, impersonateUser } = useAuth()
+const { listPeople, listRoles, restorePerson } = usePeople()
 
 const handleImpersonate = async (p) => {
     const fullName = `${p.first_name} ${p.last_name}`
@@ -108,17 +109,21 @@ const fetchData = async () => {
 
     loading.value = true
 
-    // Fetch roles for filter dropdown
-    const { data: rolesData } = await supabase.from('roles').select('id, name').order('name')
-    roles.value = rolesData || []
+    // Fetch roles for filter dropdown via composable
+    const rolesResult = await listRoles()
+    if (rolesResult.success) {
+        roles.value = rolesResult.roles
+    }
 
-    let query = supabase.from('people_enriched').select('*').order('last_name')
-    if (tenantId) query = query.eq('tenant_id', tenantId)
+    // Fetch people via composable
+    const peopleResult = await listPeople()
+    if (peopleResult.success) {
+        // Filter archived if needed (RPC doesn't support this param yet)
+        people.value = showArchived.value 
+            ? peopleResult.people 
+            : peopleResult.people.filter(p => !p.deleted_at)
+    }
     
-    if (!showArchived.value) query = query.is('deleted_at', null)
-
-    const { data } = await query
-    people.value = data || []
     checkRouteParam()
     loading.value = false
 }
@@ -167,7 +172,7 @@ const handleSaved = () => {
 
 const handleRestore = async (p) => {
     if (!confirm("Restore this person?")) return
-    await supabase.from('people').update({ deleted_at: null }).eq('id', p.id)
+    await restorePerson(p.id)
     showDetail.value = false
     fetchData()
 }

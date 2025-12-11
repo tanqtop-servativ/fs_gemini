@@ -162,6 +162,23 @@ export function usePeople() {
         return { success: true, roles: data || [] }
     }
 
+    /**
+     * Restore an archived person
+     * @param {string} personId
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const restorePerson = async (personId) => {
+        const { error } = await supabase
+            .from('people')
+            .update({ deleted_at: null })
+            .eq('id', personId)
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true }
+    }
+
     return {
         listPeople,
         getPersonDetail,
@@ -169,6 +186,7 @@ export function usePeople() {
         createPerson,
         updatePerson,
         deletePerson,
+        restorePerson,
         listRoles
     }
 }

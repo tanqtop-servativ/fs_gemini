@@ -1,6 +1,5 @@
 <script setup>
 import { ref, watch, reactive, onMounted, onUnmounted } from 'vue'
-import { supabase } from '../../lib/supabase'
 import { usePeople } from '../../composables/usePeople'
 import { X, Save, Check, UserPlus, Trash2 } from 'lucide-vue-next'
 
@@ -12,7 +11,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 // Composables
-const { createUserLogin, createPerson, updatePerson, assignRoles, archivePerson } = usePeople()
+const { createUserLogin, createPerson, updatePerson, assignRoles, archivePerson, listRoles: fetchRoles } = usePeople()
 
 // State
 const loading = ref(false)
@@ -36,10 +35,9 @@ watch(() => props.isOpen, async (open) => {
     loading.value = true
     resetForm()
     
-    // Fetch Roles
-    const { data } = await supabase.from('roles').select('id, name')
-        .order('name')
-    roles.value = data || []
+    // Fetch Roles via composable
+    const rolesResult = await fetchRoles()
+    roles.value = rolesResult.success ? rolesResult.roles : []
 
     if (props.person) {
       loadPerson(props.person)

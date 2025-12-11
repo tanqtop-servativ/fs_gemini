@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../composables/useAuth'
+import { useRoles } from '../../composables/useRoles'
 import { X, Plus, Pencil, Trash2, RotateCcw, GripVertical, History } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
 
@@ -24,6 +25,7 @@ const formName = ref('')
 const formDesc = ref('')
 const saving = ref(false)
 const { effectiveTenantId } = useAuth()
+const { listRoles: fetchRolesFromComposable, createRole, updateRole, toggleRoleArchive, updateRoleOrder } = useRoles()
 
 watch(() => [props.isOpen, showArchived.value], async ([open]) => {
   if (open) {
@@ -36,11 +38,10 @@ watch(() => [props.isOpen, showArchived.value], async ([open]) => {
 }, { immediate: true })
 
 const fetchRoles = async () => {
-    let query = supabase.from('roles').select('*').order('sort_order')
-    if (!showArchived.value) query = query.is('deleted_at', null)
-    
-    const { data } = await query
-    roles.value = data || []
+    const result = await fetchRolesFromComposable(showArchived.value)
+    if (result.success) {
+        roles.value = result.roles
+    }
 }
 
 const fetchAuditHistory = async () => {
@@ -76,24 +77,23 @@ const startEdit = (role) => {
 const saveRole = async () => {
     if (!formName.value) return
     saving.value = true
-    
-    const tenantId = effectiveTenantId.value
-
-    const payload = {
-        name: formName.value,
-        description: formDesc.value,
-        tenant_id: tenantId 
-    }
 
     try {
         if (editingRole.value.id) {
-             const { error } = await supabase.from('roles').update(payload).eq('id', editingRole.value.id)
-             if (error) throw error
+            const result = await updateRole({
+                id: editingRole.value.id,
+                name: formName.value,
+                description: formDesc.value
+            })
+            if (!result.success) throw new Error(result.error)
         } else {
-             // New role - set sort_order to end
-             payload.sort_order = roles.value.length
-             const { error } = await supabase.from('roles').insert(payload)
-             if (error) throw error
+            // New role - set sort_order to end
+            const result = await createRole({
+                name: formName.value,
+                description: formDesc.value,
+                sort_order: roles.value.length
+            })
+            if (!result.success) throw new Error(result.error)
         }
         editingRole.value = null
         fetchRoles()
@@ -112,8 +112,7 @@ const toggleArchive = async (role) => {
     const isDeleted = !!role.deleted_at
     if (!confirm(isDeleted ? "Restore?" : "Archive?")) return
     
-    const updates = { deleted_at: isDeleted ? null : new Date().toISOString() }
-    await supabase.from('roles').update(updates).eq('id', role.id)
+    await toggleRoleArchive(role.id, !isDeleted)
     fetchRoles()
     if (activeTab.value === 'history') {
         setTimeout(fetchAuditHistory, 500)
@@ -127,9 +126,7 @@ const onDragEnd = async () => {
         sort_order: index
     }))
 
-    for (const update of updates) {
-        await supabase.from('roles').update({ sort_order: update.sort_order }).eq('id', update.id)
-    }
+    await updateRoleOrder(updates)
 }
 
 const formatTime = (ts) => {
