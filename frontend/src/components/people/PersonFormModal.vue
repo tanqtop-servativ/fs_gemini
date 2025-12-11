@@ -206,29 +206,24 @@ onUnmounted(() => {
             <!-- Color Picker -->
             <div>
                  <label class="text-xs font-bold text-gray-500 uppercase mb-2 block">Color</label>
-                 <div class="flex items-center gap-4">
-                     <!-- Color Wheel Input -->
-                     <div class="relative">
+                 <div class="flex items-center gap-3">
+                     <!-- Clickable Color Preview (opens hidden color picker) -->
+                     <label class="cursor-pointer">
+                         <div :style="{ backgroundColor: form.color }" class="w-10 h-10 rounded-lg shadow-inner border border-gray-200 hover:border-gray-400 transition-colors"></div>
                          <input 
                              type="color" 
                              v-model="form.color" 
-                             class="w-16 h-16 rounded-full cursor-pointer border-2 border-gray-200 hover:border-gray-400 transition-all appearance-none"
-                             style="-webkit-appearance: none; padding: 0;"
+                             class="sr-only"
                          >
-                     </div>
-                     <!-- Color Preview & Hex -->
-                     <div class="flex-1">
-                         <div class="flex items-center gap-3">
-                             <div :style="{ backgroundColor: form.color }" class="w-10 h-10 rounded-lg shadow-inner border border-gray-200"></div>
-                             <input 
-                                 v-model="form.color" 
-                                 class="w-24 border p-2 rounded text-sm font-mono uppercase"
-                                 maxlength="7"
-                                 placeholder="#FFFFFF"
-                             >
-                         </div>
-                         <p class="text-xs text-gray-400 mt-1">Choose a color to identify this person</p>
-                     </div>
+                     </label>
+                     <!-- Hex Input -->
+                     <input 
+                         v-model="form.color" 
+                         class="w-24 border p-2 rounded text-sm font-mono uppercase"
+                         maxlength="7"
+                         placeholder="#FFFFFF"
+                     >
+                     <p class="text-xs text-gray-400">Choose a color to identify this person</p>
                  </div>
             </div>
             <div>
