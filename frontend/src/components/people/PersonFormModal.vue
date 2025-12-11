@@ -23,6 +23,7 @@ const form = reactive({
   first_name: '',
   last_name: '',
   email: '',
+  color: '#3B82F6',
   role_ids: [],
   create_user: false,
   auth_method: 'invite', // invite, manual
@@ -52,6 +53,7 @@ const resetForm = () => {
     form.first_name = ''
     form.last_name = ''
     form.email = ''
+    form.color = '#3B82F6'
     form.role_ids = []
     form.create_user = false
     form.auth_method = 'invite'
@@ -62,9 +64,8 @@ const loadPerson = (p) => {
     form.first_name = p.first_name
     form.last_name = p.last_name
     form.email = p.email
-    form.role_ids = p.role_ids || [] // enriched view has role_ids array? people_enriched usually does. 
-    // Wait, original people.js used `p.role_ids` but let's verify if `people_enriched` has it.
-    // Assuming yes based on original code `currentRoleIds = person && person.role_ids`.
+    form.color = p.color || '#3B82F6'
+    form.role_ids = p.role_ids || []
 }
 
 const handleSave = async () => {
@@ -97,6 +98,7 @@ const handleSave = async () => {
                 first_name: form.first_name,
                 last_name: form.last_name,
                 email: form.email,
+                color: form.color,
                 role_ids: form.role_ids
             })
             if (!result.success) throw new Error(result.error)
@@ -106,6 +108,7 @@ const handleSave = async () => {
                 first_name: form.first_name,
                 last_name: form.last_name,
                 email: form.email,
+                color: form.color,
                 userId
             })
             if (!result.success) throw new Error(result.error)
@@ -200,6 +203,34 @@ onUnmounted(() => {
             </div>
 
             <!-- Roles -->
+            <!-- Color Picker -->
+            <div>
+                 <label class="text-xs font-bold text-gray-500 uppercase mb-2 block">Color</label>
+                 <div class="flex items-center gap-4">
+                     <!-- Color Wheel Input -->
+                     <div class="relative">
+                         <input 
+                             type="color" 
+                             v-model="form.color" 
+                             class="w-16 h-16 rounded-full cursor-pointer border-2 border-gray-200 hover:border-gray-400 transition-all appearance-none"
+                             style="-webkit-appearance: none; padding: 0;"
+                         >
+                     </div>
+                     <!-- Color Preview & Hex -->
+                     <div class="flex-1">
+                         <div class="flex items-center gap-3">
+                             <div :style="{ backgroundColor: form.color }" class="w-10 h-10 rounded-lg shadow-inner border border-gray-200"></div>
+                             <input 
+                                 v-model="form.color" 
+                                 class="w-24 border p-2 rounded text-sm font-mono uppercase"
+                                 maxlength="7"
+                                 placeholder="#FFFFFF"
+                             >
+                         </div>
+                         <p class="text-xs text-gray-400 mt-1">Choose a color to identify this person</p>
+                     </div>
+                 </div>
+            </div>
             <div>
                  <label class="text-xs font-bold text-gray-500 uppercase mb-2 block">Assign Roles</label>
                  <div class="max-h-32 overflow-y-auto border border-gray-100 rounded p-2 bg-slate-50 grid grid-cols-2 gap-2">

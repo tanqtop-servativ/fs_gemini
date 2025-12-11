@@ -80,10 +80,11 @@ export function usePeople() {
      * @param {string} person.last_name
      * @param {string} [person.email]
      * @param {string} [person.phone]
+     * @param {string} [person.color] - Hex color for visual identification
      * @param {string[]} [person.role_ids] - Array of role UUIDs
      * @returns {Promise<{success: boolean, person_id?: string, error?: string}>}
      */
-    const createPerson = async ({ first_name, last_name, email = null, phone = null, role_ids = [] }) => {
+    const createPerson = async ({ first_name, last_name, email = null, phone = null, color = '#3B82F6', role_ids = [] }) => {
         const tenantId = effectiveTenantId.value
         if (!tenantId) {
             return { success: false, error: 'Tenant ID not found' }
@@ -95,6 +96,7 @@ export function usePeople() {
             p_last_name: last_name,
             p_email: email,
             p_phone: phone,
+            p_color: color,
             p_role_ids: role_ids
         })
 
@@ -112,16 +114,18 @@ export function usePeople() {
      * @param {string} person.last_name
      * @param {string} [person.email]
      * @param {string} [person.phone]
+     * @param {string} [person.color] - Hex color for visual identification
      * @param {string[]} [person.role_ids] - Array of role UUIDs
      * @returns {Promise<{success: boolean, error?: string}>}
      */
-    const updatePerson = async ({ id, first_name, last_name, email = null, phone = null, role_ids = [] }) => {
+    const updatePerson = async ({ id, first_name, last_name, email = null, phone = null, color = '#3B82F6', role_ids = [] }) => {
         const { data, error } = await supabase.rpc('update_person', {
             p_person_id: id,
             p_first_name: first_name,
             p_last_name: last_name,
             p_email: email,
             p_phone: phone,
+            p_color: color,
             p_role_ids: role_ids
         })
 

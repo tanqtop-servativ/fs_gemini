@@ -242,6 +242,7 @@ CREATE OR REPLACE FUNCTION public.create_person(
     p_last_name text,
     p_email text DEFAULT NULL,
     p_phone text DEFAULT NULL,
+    p_color text DEFAULT '#3B82F6',
     p_role_ids uuid[] DEFAULT '{}'
 )
 RETURNS jsonb
@@ -252,8 +253,8 @@ DECLARE
     new_id uuid;
     role_id uuid;
 BEGIN
-    INSERT INTO people (tenant_id, first_name, last_name, email, phone)
-    VALUES (p_tenant_id, p_first_name, p_last_name, p_email, p_phone)
+    INSERT INTO people (tenant_id, first_name, last_name, email, phone, color)
+    VALUES (p_tenant_id, p_first_name, p_last_name, p_email, p_phone, p_color)
     RETURNING id INTO new_id;
     
     -- Assign roles
@@ -274,6 +275,7 @@ CREATE OR REPLACE FUNCTION public.update_person(
     p_last_name text,
     p_email text DEFAULT NULL,
     p_phone text DEFAULT NULL,
+    p_color text DEFAULT '#3B82F6',
     p_role_ids uuid[] DEFAULT '{}'
 )
 RETURNS jsonb
@@ -284,7 +286,7 @@ DECLARE
     role_id uuid;
 BEGIN
     UPDATE people
-    SET first_name = p_first_name, last_name = p_last_name, email = p_email, phone = p_phone
+    SET first_name = p_first_name, last_name = p_last_name, email = p_email, phone = p_phone, color = p_color
     WHERE id = p_person_id;
     
     -- Replace roles
