@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, watch, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { uploadFile } from '../../lib/upload'
 import { useAuth } from '../../composables/useAuth'
@@ -121,6 +121,21 @@ const fetchDropdowns = async () => {
   const { data: c } = await supabase.from('master_item_catalog').select('*')
   if (c) catalog.value = c
 }
+
+// Computed: Filter people by role
+const owners = computed(() => {
+  return people.value.filter(p => {
+    const roles = (p.person_roles || []).map(pr => pr.roles?.name).filter(Boolean)
+    return roles.includes('Owner')
+  })
+})
+
+const managers = computed(() => {
+  return people.value.filter(p => {
+    const roles = (p.person_roles || []).map(pr => pr.roles?.name).filter(Boolean)
+    return roles.includes('Property Manager')
+  })
+})
 
 const loadPropertyDetails = async (prop) => {
   console.log('[PropertyForm] Loading property details:', prop)
@@ -283,8 +298,8 @@ const handleFrontPhoto = async (e) => {
 // Logic: Save
 const saveData = async () => {
   errorMessage.value = ''
-  if (!form.name || !form.owner_ids.length || !form.manager_ids.length) {
-    errorMessage.value = "Name, Owner, and Manager are required."
+  if (!form.name || !form.manager_ids.length) {
+    errorMessage.value = "Name and Property Manager are required."
     return
   }
   
@@ -541,9 +556,10 @@ onUnmounted(() => {
         <!-- People -->
         <div class="grid grid-cols-2 gap-3 pt-2">
           <div>
-            <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Owner(s) <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Owner(s)</label>
             <div class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1">
-              <label v-for="p in people" :key="p.id" class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+              <div v-if="owners.length === 0" class="text-xs text-gray-400 italic p-1">No people with Owner role</div>
+              <label v-for="p in owners" :key="p.id" class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
                 <input type="checkbox" :value="p.id" v-model="form.owner_ids">
                 <span class="text-xs">{{ p.first_name }} {{ p.last_name }}</span>
               </label>
@@ -552,7 +568,8 @@ onUnmounted(() => {
           <div>
             <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property Manager(s) <span class="text-red-500">*</span></label>
             <div class="h-32 overflow-y-auto border border-gray-200 bg-white rounded p-2 space-y-1">
-              <label v-for="p in people" :key="p.id" class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+              <div v-if="managers.length === 0" class="text-xs text-gray-400 italic p-1">No people with Property Manager role</div>
+              <label v-for="p in managers" :key="p.id" class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
                 <input type="checkbox" :value="p.id" v-model="form.manager_ids">
                 <span class="text-xs">{{ p.first_name }} {{ p.last_name }}</span>
               </label>
