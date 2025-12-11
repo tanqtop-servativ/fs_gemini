@@ -70,6 +70,7 @@ const loadPerson = (p) => {
 
 const handleSave = async () => {
     if (!form.first_name || !form.email) return alert("Name and Email required")
+    if (!form.role_ids.length) return alert("At least one role must be selected")
     
     if (form.create_user && form.auth_method === 'manual' && form.password.length < 6) {
         return alert("Password must be at least 6 characters")
