@@ -152,9 +152,16 @@ const handleRestore = async (p) => {
            <tr v-for="p in people" :key="p.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(p)">
              <!-- Name -->
              <td class="px-6 py-4">
-                 <div class="font-bold text-slate-900 flex items-center gap-2" :class="{ 'line-through text-gray-500': p.deleted_at }">
-                     {{ p.first_name }} {{ p.last_name }}
-                     <span v-if="p.deleted_at" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase no-underline">Archived</span>
+                 <div class="flex items-center gap-3">
+                     <!-- Color indicator bar -->
+                     <div 
+                         :style="{ backgroundColor: p.color || '#3B82F6' }" 
+                         class="w-1 h-8 rounded-full flex-shrink-0"
+                     ></div>
+                     <div class="font-bold text-slate-900" :class="{ 'line-through text-gray-500': p.deleted_at }">
+                         {{ p.first_name }} {{ p.last_name }}
+                         <span v-if="p.deleted_at" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase no-underline ml-2">Archived</span>
+                     </div>
                  </div>
              </td>
              <!-- Roles -->
