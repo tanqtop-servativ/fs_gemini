@@ -341,7 +341,9 @@ const softDeleteJob = async () => {
              <!-- Job Title -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900">{{ item.title }}</div>
-                 <div v-if="item.next_scheduled_start" class="text-xs text-slate-500">{{ formatServiceDate(item.next_scheduled_start) }}</div>
+                 <div v-if="item.scheduled_visits && item.scheduled_visits.length > 0">
+                     <div v-for="(visit, idx) in item.scheduled_visits" :key="idx" class="text-xs text-slate-500">{{ formatServiceDate(visit) }}</div>
+                 </div>
                  <div v-else class="text-xs text-gray-400 italic">Not scheduled</div>
              </td>
              <!-- Property -->

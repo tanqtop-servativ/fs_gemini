@@ -28,15 +28,13 @@ BEGIN
                 'created_at', j.created_at,
                 'tenant_id', j.tenant_id,
                 
-                -- Next scheduled visit date
-                'next_scheduled_start', (
-                    SELECT v.scheduled_start 
+                -- All scheduled visits (chronologically ordered)
+                'scheduled_visits', (
+                    SELECT COALESCE(jsonb_agg(v.scheduled_start ORDER BY v.scheduled_start ASC), '[]'::jsonb)
                     FROM visits v 
                     WHERE v.job_id = j.id 
                     AND v.status IN ('Scheduled', 'Pending')
                     AND v.scheduled_start IS NOT NULL
-                    ORDER BY v.scheduled_start ASC 
-                    LIMIT 1
                 ),
                 
                 -- Joined Property Name
