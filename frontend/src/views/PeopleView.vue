@@ -187,7 +187,7 @@ const handleRestore = async (p) => {
           
           <div 
             v-if="showRoleFilter" 
-            class="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[180px] py-1"
+            class="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-max py-1"
           >
             <label 
               v-for="r in roles" :key="r.id" 
