@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { Plus, Eye, Mail, Shield, UserCircle } from 'lucide-vue-next'
 import PersonDetailModal from '../components/people/PersonDetailModal.vue'
 import PersonFormModal from '../components/people/PersonFormModal.vue'
 import RolesManagerModal from '../components/people/RolesManagerModal.vue'
+import SortableHeader from '../components/SortableHeader.vue'
 
 // State
 const router = useRouter()
@@ -19,6 +20,39 @@ const showDetail = ref(false)
 const showForm = ref(false)
 const showRoles = ref(false)
 const selectedPerson = ref(null)
+
+// Sorting
+const sortKey = ref('last_name')
+const sortDir = ref('asc')
+
+const handleSort = (col) => {
+  if (sortKey.value === col) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = col
+    sortDir.value = 'asc'
+  }
+}
+
+const sortedPeople = computed(() => {
+  return [...people.value].sort((a, b) => {
+    let aVal = a[sortKey.value] || ''
+    let bVal = b[sortKey.value] || ''
+    
+    // Handle name column specially (first_name + last_name)
+    if (sortKey.value === 'name') {
+      aVal = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase()
+      bVal = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase()
+    } else if (typeof aVal === 'string') {
+      aVal = aVal.toLowerCase()
+      bVal = bVal.toLowerCase()
+    }
+    
+    if (aVal < bVal) return sortDir.value === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+})
 
 // Actions
 import { useAuth } from '../composables/useAuth'
@@ -135,9 +169,9 @@ const handleRestore = async (p) => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Name</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Roles</th>
-            <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider">Contact</th>
+            <th class="px-6 py-4"><SortableHeader column="name" :sortKey="sortKey" :sortDir="sortDir" @sort="handleSort">Name</SortableHeader></th>
+            <th class="px-6 py-4"><SortableHeader column="roles_display" :sortKey="sortKey" :sortDir="sortDir" @sort="handleSort">Roles</SortableHeader></th>
+            <th class="px-6 py-4"><SortableHeader column="email" :sortKey="sortKey" :sortDir="sortDir" @sort="handleSort">Contact</SortableHeader></th>
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
         </thead>
@@ -149,7 +183,7 @@ const handleRestore = async (p) => {
              <td colspan="4" class="px-6 py-8 text-center text-gray-400">No people found.</td>
            </tr>
 
-           <tr v-for="p in people" :key="p.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(p)">
+           <tr v-for="p in sortedPeople" :key="p.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(p)">
              <!-- Name -->
              <td class="px-6 py-4">
                  <div class="flex items-center gap-3">
