@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { uploadFile } from '../../lib/upload'
 import { useAuth } from '../../composables/useAuth'
 import { useProperties } from '../../composables/useProperties'
+import { useLookups } from '../../composables/useLookups'
 import { 
   X, Save, Trash2, Upload, Plus, RotateCcw, 
   Wifi, Key, Home, Image as ImageIcon 
@@ -11,6 +12,7 @@ import {
 
 const { userProfile } = useAuth()
 const { saveProperty, archiveProperty, getPropertyDetail } = useProperties()
+const { lookupPeople, lookupBOMTemplates, getBOMTemplateItems } = useLookups()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -112,11 +114,22 @@ watch(() => props.isOpen, async (open) => {
 })
 
 const fetchDropdowns = async () => {
-  const { data: p } = await supabase.from('people').select('id, first_name, last_name, person_roles(roles(name))')
-  if (p) people.value = p
+  // Fetch people with roles via composable
+  const peopleResult = await lookupPeople()
+  if (peopleResult.success) {
+    people.value = peopleResult.people.map(p => ({
+      id: p.id,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      person_roles: [{ roles: { name: p.roles } }] // Transform to expected format
+    }))
+  }
   
-  const { data: t } = await supabase.from('bom_templates').select('id, name').is('deleted_at', null)
-  if (t) templates.value = t
+  // Fetch BOM templates via composable
+  const templatesResult = await lookupBOMTemplates()
+  if (templatesResult.success) {
+    templates.value = templatesResult.templates
+  }
   
   const { data: c } = await supabase.from('master_item_catalog').select('*')
   if (c) catalog.value = c
@@ -198,9 +211,9 @@ const singleItemQty = ref(1)
 
 const applyTemplate = async () => {
   if (!selectedTemplateId.value) return
-  const { data: items } = await supabase.from('bom_template_items').select('*').eq('bom_template_id', selectedTemplateId.value)
-  if (items) {
-    items.forEach(newItem => {
+  const result = await getBOMTemplateItems(selectedTemplateId.value)
+  if (result.success && result.items) {
+    result.items.forEach(newItem => {
         const existing = inventory.value.find(i => i.name.toLowerCase() === newItem.item_name.toLowerCase())
         if (existing) existing.qty += newItem.quantity
         else inventory.value.push({ name: newItem.item_name, qty: newItem.quantity, category: newItem.category })
