@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
-import { Plus, Eye, Package } from 'lucide-vue-next'
+import { Plus, Eye } from 'lucide-vue-next'
 import BOMTemplateFormModal from '../components/bom/BOMTemplateFormModal.vue'
 import BOMTemplateDetailModal from '../components/bom/BOMTemplateDetailModal.vue'
 
@@ -112,7 +112,6 @@ const handleSaved = () => {
              <!-- Name -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900 flex items-center gap-2">
-                     <Package size="16" class="text-blue-500"/>
                      <span :class="{'line-through text-gray-500': t.deleted_at}">{{ t.name }}</span>
                      <span v-if="t.deleted_at" class="text-[10px] bg-red-100 text-red-600 px-1 rounded uppercase font-bold no-underline decoration-0">Archived</span>
                  </div>
