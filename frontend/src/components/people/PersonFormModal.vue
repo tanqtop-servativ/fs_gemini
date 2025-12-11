@@ -228,11 +228,15 @@ onUnmounted(() => {
             </div>
             <div>
                  <label class="text-xs font-bold text-gray-500 uppercase mb-2 block">Assign Roles</label>
-                 <div class="max-h-32 overflow-y-auto overflow-x-auto border border-gray-100 rounded p-2 bg-slate-50 grid grid-cols-3 gap-2">
-                     <label v-for="role in roles" :key="role.id" class="flex items-center gap-2 text-sm cursor-pointer hover:bg-white p-1 rounded">
-                         <input type="checkbox" :value="role.id" v-model="form.role_ids" class="rounded border-gray-300 text-blue-600 focus:ring-0">
-                         {{ role.name }}
-                     </label>
+                 <div class="relative">
+                   <div class="max-h-32 overflow-y-auto overflow-x-auto border border-gray-100 rounded p-2 bg-slate-50 grid grid-cols-3 gap-2">
+                       <label v-for="role in roles" :key="role.id" class="flex items-center gap-2 text-sm cursor-pointer hover:bg-white p-1 rounded">
+                           <input type="checkbox" :value="role.id" v-model="form.role_ids" class="rounded border-gray-300 text-blue-600 focus:ring-0">
+                           {{ role.name }}
+                       </label>
+                   </div>
+                   <!-- Fade gradient to indicate more content -->
+                   <div v-if="roles.length > 9" class="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none rounded-b"></div>
                  </div>
             </div>
 
