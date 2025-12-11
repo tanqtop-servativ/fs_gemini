@@ -74,3 +74,7 @@ BEGIN
     );
 END;
 $$;
+
+-- Grant execute permissions to authenticated users
+GRANT EXECUTE ON FUNCTION list_people(uuid, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION list_roles() TO authenticated;
