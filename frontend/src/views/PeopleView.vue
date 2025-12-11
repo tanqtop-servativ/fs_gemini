@@ -67,6 +67,18 @@ const sortedPeople = computed(() => {
   })
 })
 
+// Computed: Count of people per role
+const roleCount = computed(() => {
+  const counts = {}
+  for (const p of people.value) {
+    const personRoles = (p.roles_display || '').split(', ').map(r => r.trim()).filter(Boolean)
+    for (const role of personRoles) {
+      counts[role] = (counts[role] || 0) + 1
+    }
+  }
+  return counts
+})
+
 // Actions
 import { useAuth } from '../composables/useAuth'
 
@@ -182,7 +194,7 @@ const handleRestore = async (p) => {
               class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm"
             >
               <input type="checkbox" :value="r.name" v-model="selectedRoles" class="rounded border-gray-300 text-blue-600 focus:ring-0">
-              {{ r.name }}
+              {{ r.name }} <span class="text-gray-400">({{ roleCount[r.name] || 0 }})</span>
             </label>
             <div v-if="selectedRoles.length > 0" class="border-t border-gray-100 mt-1 pt-1">
               <button @click="selectedRoles = []" class="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-slate-50">Clear All</button>
