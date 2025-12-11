@@ -223,7 +223,6 @@ onUnmounted(() => {
                          maxlength="7"
                          placeholder="#FFFFFF"
                      >
-                     <p class="text-xs text-gray-400">Choose a color to identify this person</p>
                  </div>
             </div>
             <div>
