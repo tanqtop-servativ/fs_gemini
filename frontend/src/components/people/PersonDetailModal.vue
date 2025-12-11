@@ -41,6 +41,11 @@ onUnmounted(() => {
                     <div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-xl font-bold text-slate-500 border-2 border-white shadow-sm">
                         {{ initials }}
                     </div>
+                    <!-- Color indicator bar -->
+                    <div 
+                        :style="{ backgroundColor: person.color || '#3B82F6' }" 
+                        class="w-1.5 h-12 rounded-full flex-shrink-0"
+                    ></div>
                     <div>
                         <h2 class="text-2xl font-bold text-slate-900" :class="{ 'line-through decoration-red-500': person.deleted_at }">
                             {{ person.first_name }} {{ person.last_name }}
