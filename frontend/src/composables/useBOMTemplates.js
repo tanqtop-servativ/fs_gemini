@@ -9,6 +9,44 @@ export function useBOMTemplates() {
     const { effectiveTenantId } = useAuth()
 
     /**
+     * Fetch all BOM templates for current tenant via RPC
+     * @param {boolean} includeArchived
+     * @returns {Promise<{success: boolean, templates?: Array, error?: string}>}
+     */
+    const listTemplates = async (includeArchived = false) => {
+        const tenantId = effectiveTenantId.value
+        if (!tenantId) {
+            return { success: false, error: 'Tenant ID not found' }
+        }
+
+        const { data, error } = await supabase.rpc('list_bom_templates', {
+            p_tenant_id: tenantId,
+            p_include_archived: includeArchived
+        })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true, templates: data || [] }
+    }
+
+    /**
+     * Fetch a template with its items via RPC
+     * @param {string} templateId
+     * @returns {Promise<{success: boolean, template?: Object, error?: string}>}
+     */
+    const getTemplate = async (templateId) => {
+        const { data, error } = await supabase.rpc('get_bom_template_detail', {
+            p_template_id: templateId
+        })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return { success: true, template: data }
+    }
+
+    /**
      * Save (create or update) a BOM template with items
      * Uses existing RPCs for atomic operations
      * @param {Object} options
@@ -59,68 +97,26 @@ export function useBOMTemplates() {
     }
 
     /**
-     * Delete (soft delete) a BOM template
+     * Archive (soft delete) a BOM template via RPC
      * @param {string} templateId
      * @returns {Promise<{success: boolean, error?: string}>}
      */
-    const deleteTemplate = async (templateId) => {
-        const { error } = await supabase
-            .from('bom_templates')
-            .update({ deleted_at: new Date().toISOString() })
-            .eq('id', templateId)
+    const archiveTemplate = async (templateId) => {
+        const { data, error } = await supabase.rpc('archive_bom_template', {
+            p_template_id: templateId
+        })
 
         if (error) {
             return { success: false, error: error.message }
         }
-        return { success: true }
-    }
-
-    /**
-     * Fetch a template with its items
-     * @param {string} templateId
-     * @returns {Promise<{success: boolean, template?: Object, error?: string}>}
-     */
-    const getTemplate = async (templateId) => {
-        const { data, error } = await supabase
-            .from('bom_templates')
-            .select('*, bom_template_items(*)')
-            .eq('id', templateId)
-            .is('deleted_at', null)
-            .single()
-
-        if (error) {
-            return { success: false, error: error.message }
-        }
-        return { success: true, template: data }
-    }
-
-    /**
-     * Fetch all BOM templates for current tenant
-     * @returns {Promise<{success: boolean, templates?: Array, error?: string}>}
-     */
-    const listTemplates = async () => {
-        const tenantId = effectiveTenantId.value
-        if (!tenantId) {
-            return { success: false, error: 'Tenant ID not found' }
-        }
-
-        const { data, error } = await supabase
-            .from('bom_templates')
-            .select('*, bom_template_items(*)')
-            .eq('tenant_id', tenantId)
-            .is('deleted_at', null)
-            .order('name')
-
-        if (error) {
-            return { success: false, error: error.message }
-        }
-        return { success: true, templates: data }
+        return data
     }
 
     return {
-        saveTemplate,
-        deleteTemplate,
+        listTemplates,
         getTemplate,
-        listTemplates
+        saveTemplate,
+        archiveTemplate
     }
 }
+

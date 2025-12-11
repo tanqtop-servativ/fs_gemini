@@ -1,6 +1,5 @@
 <script setup>
 import { ref, watch, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { supabase } from '../../lib/supabase'
 import { useBOMTemplates } from '../../composables/useBOMTemplates'
 import { X, Save, Plus, GripVertical, Trash2, Package } from 'lucide-vue-next'
 import draggable from 'vuedraggable'
@@ -13,7 +12,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 // Composables
-const { saveTemplate } = useBOMTemplates()
+const { saveTemplate, getTemplate } = useBOMTemplates()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -47,10 +46,10 @@ watch(() => props.isOpen, (open) => {
 })
 
 const fetchItems = async (id) => {
-    const { data } = await supabase.from('bom_template_items').select('*').eq('bom_template_id', id).order('sort_order')
-    if (data) {
-        form.items = data.map(i => ({
-            item_name: i.item_name,
+    const result = await getTemplate(id)
+    if (result.success && result.template) {
+        form.items = (result.template.items || []).map(i => ({
+            item_name: i.name || i.item_name,
             quantity: i.quantity,
             price: i.price,
             category: i.category,

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import AuditHistory from '../AuditHistory.vue'
-import { supabase } from '../../lib/supabase'
+import { useBOMTemplates } from '../../composables/useBOMTemplates'
 import { X, Pencil, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -11,14 +11,18 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'edit', 'refresh'])
 
+const { getTemplate, archiveTemplate } = useBOMTemplates()
+
 const items = ref([])
 const loadingItems = ref(false)
 
 const fetchItems = async () => {
     if (!props.template) return
     loadingItems.value = true
-    const { data } = await supabase.from('bom_template_items').select('*').eq('bom_template_id', props.template.id).order('sort_order')
-    items.value = data || []
+    const result = await getTemplate(props.template.id)
+    if (result.success && result.template) {
+        items.value = result.template.items || []
+    }
     loadingItems.value = false
 }
 
@@ -28,8 +32,8 @@ watch(() => props.isOpen, (open) => {
 
 const handleDelete = async () => {
     if (!confirm("Are you sure you want to archive this template?")) return
-    const { error } = await supabase.from('bom_templates').update({ deleted_at: new Date().toISOString() }).eq('id', props.template.id)
-    if (error) alert("Error: " + error.message)
+    const result = await archiveTemplate(props.template.id)
+    if (!result.success) alert("Error: " + result.error)
     else {
         emit('refresh')
         emit('close')

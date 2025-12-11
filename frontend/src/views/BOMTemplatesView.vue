@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { supabase } from '../lib/supabase'
+import { useBOMTemplates } from '../composables/useBOMTemplates'
 import { Plus, Eye } from 'lucide-vue-next'
 import BOMTemplateFormModal from '../components/bom/BOMTemplateFormModal.vue'
 import BOMTemplateDetailModal from '../components/bom/BOMTemplateDetailModal.vue'
@@ -17,6 +17,7 @@ const selectedTemplate = ref(null)
 import { useAuth } from '../composables/useAuth'
 
 const { userProfile } = useAuth()
+const { listTemplates } = useBOMTemplates()
 
 const fetchData = async () => {
     const tenantId = userProfile.value?.tenant_id
@@ -24,18 +25,11 @@ const fetchData = async () => {
 
     loading.value = true
 
-    let query = supabase
-        .from('bom_templates')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('name')
-    
-    if (!showArchived.value) {
-        query = query.is('deleted_at', null)
+    const result = await listTemplates(showArchived.value)
+    if (result.success) {
+        templates.value = result.templates
     }
-
-    const { data } = await query
-    templates.value = data || []
+    
     loading.value = false
 }
 
