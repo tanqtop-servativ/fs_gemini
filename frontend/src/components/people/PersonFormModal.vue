@@ -236,7 +236,7 @@ onUnmounted(() => {
                        </label>
                    </div>
                    <!-- Fade gradient to indicate more content -->
-                   <div v-if="roles.length > 9" class="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none rounded-b"></div>
+                   <div v-if="roles.length > 6" class="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none rounded-b"></div>
                  </div>
             </div>
 
