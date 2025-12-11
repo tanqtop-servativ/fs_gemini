@@ -15,7 +15,8 @@ const people = ref([])
 const roles = ref([])
 const loading = ref(true)
 const showArchived = ref(false)
-const selectedRole = ref('')  // Empty = all roles
+const selectedRoles = ref([])  // Array of role names
+const showRoleFilter = ref(false)
 
 // Modals
 const showDetail = ref(false)
@@ -37,12 +38,12 @@ const handleSort = (col) => {
 }
 
 const sortedPeople = computed(() => {
-  // First filter by role
+  // First filter by roles (if any selected)
   let filtered = people.value
-  if (selectedRole.value) {
+  if (selectedRoles.value.length > 0) {
     filtered = filtered.filter(p => {
       const personRoles = (p.roles_display || '').split(', ').map(r => r.trim())
-      return personRoles.includes(selectedRole.value)
+      return selectedRoles.value.some(role => personRoles.includes(role))
     })
   }
   
@@ -162,13 +163,35 @@ const handleRestore = async (p) => {
           Show Archived
         </label>
         
-        <select 
-          v-model="selectedRole" 
-          class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
-        >
-          <option value="">All Roles</option>
-          <option v-for="r in roles" :key="r.id" :value="r.name">{{ r.name }}</option>
-        </select>
+        <!-- Role Filter Dropdown -->
+        <div class="relative">
+          <button 
+            @click="showRoleFilter = !showRoleFilter"
+            class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white shadow-sm hover:bg-gray-50 flex items-center gap-2"
+          >
+            <span>{{ selectedRoles.length === 0 ? 'All Roles' : `${selectedRoles.length} Role${selectedRoles.length > 1 ? 's' : ''}` }}</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+          
+          <div 
+            v-if="showRoleFilter" 
+            class="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[180px] py-1"
+          >
+            <label 
+              v-for="r in roles" :key="r.id" 
+              class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm"
+            >
+              <input type="checkbox" :value="r.name" v-model="selectedRoles" class="rounded border-gray-300 text-blue-600 focus:ring-0">
+              {{ r.name }}
+            </label>
+            <div v-if="selectedRoles.length > 0" class="border-t border-gray-100 mt-1 pt-1">
+              <button @click="selectedRoles = []" class="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-slate-50">Clear All</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Click outside to close -->
+        <div v-if="showRoleFilter" class="fixed inset-0 z-10" @click="showRoleFilter = false"></div>
         
         <button 
           @click="showRoles = true"
