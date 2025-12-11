@@ -49,6 +49,22 @@ const {
     searchableFields: ['title', 'properties.name', 'service_opportunities.title', 'status']
 })
 
+// Format date for display: 'Mon 12/8/2025 06:00AM'
+const formatServiceDate = (dateStr) => {
+    if (!dateStr) return null
+    const date = new Date(dateStr)
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const day = days[date.getDay()]
+    const month = date.getMonth() + 1
+    const dayOfMonth = date.getDate()
+    const year = date.getFullYear()
+    let hours = date.getHours()
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    hours = hours % 12 || 12
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    return `${day} ${month}/${dayOfMonth}/${year} ${hours}:${minutes}${ampm}`
+}
+
 const fetchData = async () => {
     const tenantId = userProfile.value?.tenant_id
     if (!tenantId) return 
@@ -325,7 +341,8 @@ const softDeleteJob = async () => {
              <!-- Job Title -->
              <td class="px-6 py-4">
                  <div class="font-bold text-slate-900">{{ item.title }}</div>
-                 <div class="text-xs text-slate-500">{{ item.readable_id || item.id.slice(0, 8) }}</div>
+                 <div v-if="item.next_scheduled_start" class="text-xs text-slate-500">{{ formatServiceDate(item.next_scheduled_start) }}</div>
+                 <div v-else class="text-xs text-gray-400 italic">Not scheduled</div>
              </td>
              <!-- Property -->
              <td class="px-6 py-4">
