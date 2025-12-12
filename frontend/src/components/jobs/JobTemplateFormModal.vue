@@ -76,7 +76,10 @@ watch(() => props.isOpen, async (open) => {
                     ...t,
                     checklist: (t.job_template_checklist_items || t.checklist || [])
                         .sort((a, b) => a.sort_order - b.sort_order)
-                        .map(c => ({...c})), // Copy checklist
+                        .map(c => ({
+                            ...c, 
+                            _tempId: c.id || Math.random().toString(36).slice(2)  // Unique ID for draggable
+                        })),
                     id: t.id // Keep ID for potential updates
                 }))
             
@@ -111,7 +114,8 @@ const addChecklistItem = (taskIndex) => {
     const task = form.tasks[taskIndex]
     task.checklist.push({
         description: '', description_es: '', item_type: 'simple', 
-        sort_order: task.checklist.length
+        sort_order: task.checklist.length,
+        _tempId: Math.random().toString(36).slice(2)  // Unique ID for draggable
     })
 }
 
@@ -341,20 +345,32 @@ onUnmounted(() => {
                                     <span class="text-[10px] font-bold uppercase text-slate-400">Checklist Items</span>
                                     <button @click="addChecklistItem(index)" class="text-[10px] font-bold text-blue-500 hover:text-blue-700">+ Add Item</button>
                                 </div>
-                                <div class="space-y-2">
-                                    <div v-for="(item, cIdx) in task.checklist" :key="cIdx" class="flex gap-2 items-start group/check">
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
-                                            <input v-model="item.description" class="w-full border p-1 rounded text-xs" placeholder="Item (EN)">
-                                            <input v-model="item.description_es" class="w-full border border-blue-50 p-1 rounded text-xs" placeholder="Item (ES)">
+                                <draggable 
+                                   v-model="task.checklist" 
+                                   item-key="_tempId" 
+                                   handle=".checklist-drag-handle"
+                                   class="space-y-2"
+                                   ghost-class="opacity-50"
+                                   :group="{ name: 'checklist-' + index }"
+                                >
+                                    <template #item="{ element: item, index: cIdx }">
+                                        <div class="flex gap-2 items-start group/check bg-white rounded border border-gray-100 p-1">
+                                            <div class="w-6 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-gray-100 rounded checklist-drag-handle self-stretch">
+                                                <GripVertical size="12" class="text-gray-300" />
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
+                                                <input v-model="item.description" class="w-full border p-1 rounded text-xs" placeholder="Item (EN)">
+                                                <input v-model="item.description_es" class="w-full border border-blue-50 p-1 rounded text-xs" placeholder="Item (ES)">
+                                            </div>
+                                            <select v-model="item.item_type" class="border p-1 rounded text-xs h-7 bg-white text-slate-600">
+                                                <option value="simple">Check</option>
+                                                <option value="input">Input</option>
+                                            </select>
+                                            <button @click="removeChecklistItem(index, cIdx)" class="text-gray-300 hover:text-red-400 pt-1"><X size="14"/></button>
                                         </div>
-                                        <select v-model="item.item_type" class="border p-1 rounded text-xs h-7 bg-white text-slate-600">
-                                            <option value="simple">Check</option>
-                                            <option value="input">Input</option>
-                                        </select>
-                                        <button @click="removeChecklistItem(index, cIdx)" class="text-gray-300 hover:text-red-400 pt-1"><X size="14"/></button>
-                                    </div>
-                                    <div v-if="task.checklist.length === 0" class="text-center text-xs text-gray-400 italic py-1">No items.</div>
-                                </div>
+                                    </template>
+                                </draggable>
+                                <div v-if="task.checklist.length === 0" class="text-center text-xs text-gray-400 italic py-1">No items.</div>
                             </div>
 
                         </div>

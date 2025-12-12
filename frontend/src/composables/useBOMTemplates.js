@@ -112,11 +112,23 @@ export function useBOMTemplates() {
         return data
     }
 
+    /**
+     * Reorder templates
+     * @param {Array<string>} ids - Ordered list of IDs
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const reorderTemplates = async (ids) => {
+        const { error } = await supabase.rpc('reorder_bom_templates', { p_ids: ids })
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
     return {
         listTemplates,
         getTemplate,
         saveTemplate,
-        archiveTemplate
+        archiveTemplate,
+        reorderTemplates
     }
 }
 

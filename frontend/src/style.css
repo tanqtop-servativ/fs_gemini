@@ -113,13 +113,11 @@ body {
 }
 
 .status-completed {
-    opacity: 0.5;
-    filter: grayscale(100%);
+    opacity: 0.6;
+    filter: grayscale(80%);
 }
 
-.status-completed .fc-event-main {
-    text-decoration: line-through;
-}
+/* CSS checkmark and strikethrough removed in favor of direct HTML injection in CalendarView */
 
 @keyframes progress-stripes {
     from {

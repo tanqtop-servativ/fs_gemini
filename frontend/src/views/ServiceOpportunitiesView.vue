@@ -365,7 +365,7 @@ const handleContextMenu = (e, item) => {
              <!-- Workflow Visualization -->
              <td class="px-6 py-4">
                  <div v-if="jobsMap[item.id] && jobsMap[item.id].length > 0" class="flex flex-wrap items-center gap-1">
-                     <div v-for="(job, idx) in jobsMap[item.id].sort((a,b)=>a.id-b.id)" :key="job.id" class="flex items-center">
+                     <div v-for="(job, idx) in jobsMap[item.id].slice().sort((a,b)=>(a.sort_order || 0) - (b.sort_order || 0))" :key="job.id" class="flex items-center">
                          <div class="px-1.5 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap" :class="getWorkflowColor(job.status)">
                              {{ job.title }}
                          </div>

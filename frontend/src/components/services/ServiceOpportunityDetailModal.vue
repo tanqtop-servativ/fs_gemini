@@ -16,7 +16,7 @@ const props = defineProps({
 })
 
 const { snoozeOpportunity, unsnoozeOpportunity, dismissOpportunity, undismissOpportunity } = useServiceOpportunities()
-const { createVisit } = useVisits()
+const { createVisit, updateVisit } = useVisits()
 
 const snoozeInput = ref(null)
 
@@ -49,7 +49,8 @@ const fetchJobs = async () => {
             visits (id, scheduled_start, scheduled_end, status)
         `)
         .eq('service_opportunity_id', props.opportunity.id)
-        .order('id', { ascending: true })
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
 
     jobs.value = data || []
     loadingJobs.value = false
@@ -57,6 +58,7 @@ const fetchJobs = async () => {
 
 // Scheduling state
 const schedulingJobId = ref(null)
+const editingVisitId = ref(null)
 const scheduleStartDate = ref('')
 const scheduleEndDate = ref('')
 
@@ -81,7 +83,7 @@ const scheduleDuration = computed(() => {
 
 // Auto-update end time when start time changes (default: 15 minutes later)
 watch(scheduleStartDate, (newStart) => {
-    if (!newStart) return
+    if (!newStart || editingVisitId.value) return // Don't auto-update if editing existing or empty
     
     const start = new Date(newStart)
     const end = new Date(start.getTime() + 15 * 60000) // 15 minutes later
@@ -92,24 +94,40 @@ watch(scheduleStartDate, (newStart) => {
     scheduleEndDate.value = localEnd.toISOString().slice(0, 16)
 })
 
-const startScheduling = (jobId) => {
+const startScheduling = (jobId, existingVisit = null) => {
     schedulingJobId.value = jobId
-    // Default to tomorrow 9am - 10am (1 hour)
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    d.setHours(9, 0, 0, 0)
-    const offset = d.getTimezoneOffset() * 60000
-    const localStart = new Date(d.getTime() - offset)
-    scheduleStartDate.value = localStart.toISOString().slice(0, 16)
     
-    // Default end time: 1 hour later
-    d.setHours(10, 0, 0, 0)
-    const localEnd = new Date(d.getTime() - offset)
-    scheduleEndDate.value = localEnd.toISOString().slice(0, 16)
+    if (existingVisit) {
+        editingVisitId.value = existingVisit.id
+        // Format existing times for input
+        const start = new Date(existingVisit.scheduled_start)
+        const offset = start.getTimezoneOffset() * 60000
+        scheduleStartDate.value = new Date(start.getTime() - offset).toISOString().slice(0, 16)
+        
+        if (existingVisit.scheduled_end) {
+             const end = new Date(existingVisit.scheduled_end)
+             scheduleEndDate.value = new Date(end.getTime() - offset).toISOString().slice(0, 16)
+        } else {
+             // Default end if missing
+             const end = new Date(start.getTime() + 60 * 60000)
+             scheduleEndDate.value = new Date(end.getTime() - offset).toISOString().slice(0, 16)
+        }
+    } else {
+        editingVisitId.value = null
+        // Default to tomorrow 9am - 10am (1 hour)
+        const d = new Date()
+        d.setDate(d.getDate() + 1)
+        d.setHours(9, 0, 0, 0)
+        const offset = d.getTimezoneOffset() * 60000
+        const localDate = new Date(d.getTime() - offset)
+        scheduleStartDate.value = localDate.toISOString().slice(0, 16)
+        // Watcher will set end date
+    }
 }
 
 const cancelScheduling = () => {
     schedulingJobId.value = null
+    editingVisitId.value = null
     scheduleStartDate.value = ''
     scheduleEndDate.value = ''
 }
@@ -123,12 +141,18 @@ const confirmSchedule = async (jobId) => {
     const startIso = new Date(scheduleStartDate.value).toISOString()
     const endIso = scheduleEndDate.value ? new Date(scheduleEndDate.value).toISOString() : null
     
-    const result = await createVisit(jobId, startIso, endIso)
+    let result;
+    if (editingVisitId.value) {
+        result = await updateVisit(editingVisitId.value, startIso, endIso)
+    } else {
+        result = await createVisit(jobId, startIso, endIso)
+    }
     
     if (!result.success) {
         alert('Error scheduling: ' + result.error)
     } else {
         schedulingJobId.value = null
+        editingVisitId.value = null
         scheduleStartDate.value = ''
         scheduleEndDate.value = ''
         await fetchJobs() // Refresh to show new schedule
@@ -207,18 +231,32 @@ const generateWorkflow = async () => {
     generating.value = false
 }
 
-const handleDismiss = async () => {
-    const reason = prompt("Why is this being dismissed?")
-    if (reason === null) return // Cancelled
-    if (!reason.trim()) {
-        alert("A reason is required to dismiss.")
+const showDismissDialog = ref(false)
+const dismissReason = ref('')
+
+const handleDismiss = () => {
+    dismissReason.value = ''
+    showDismissDialog.value = true
+}
+
+const closeDismissDialog = () => {
+    showDismissDialog.value = false
+    dismissReason.value = ''
+}
+
+const confirmDismiss = async () => {
+    if (!dismissReason.value.trim()) {
+        alert("A reason is required.")
         return
     }
     
-    const { success, error } = await dismissOpportunity(props.opportunity.id, reason)
+    // Optimistic UI updates could go here
     
-    if (!success) alert('Error: ' + error)
-    else {
+    const { success, error } = await dismissOpportunity(props.opportunity.id, dismissReason.value)
+    
+    if (!success) {
+        alert('Error: ' + error)
+    } else {
         emit('refresh')
         emit('close')
     }
@@ -461,10 +499,16 @@ onUnmounted(() => {
 
                              <!-- Schedule Section -->
                              <div class="mb-3 pl-14">
-                                 <div v-if="getJobSchedule(job)" class="flex items-center gap-2 text-xs text-slate-600 bg-blue-50 rounded px-3 py-2 border border-blue-100">
-                                     <Calendar size="14" class="text-blue-500" />
-                                     <span class="font-medium">{{ formatSchedule(getJobSchedule(job)) }}</span>
-                                 </div>
+                                 <div 
+                                    v-if="getJobSchedule(job)" 
+                                    @click="startScheduling(job.id, job.visits.find(v => v.scheduled_start))"
+                                    class="flex items-center gap-2 text-xs text-slate-600 bg-blue-50 rounded px-3 py-2 border border-blue-100 cursor-pointer hover:bg-blue-100 hover:border-blue-200 transition group/schedule"
+                                    title="Click to reschedule"
+                                >
+                                    <Calendar size="14" class="text-blue-500" />
+                                    <span class="font-medium">{{ formatSchedule(getJobSchedule(job)) }}</span>
+                                    <Pencil size="12" class="ml-auto text-blue-400 opacity-0 group-hover/schedule:opacity-100" />
+                                </div>
                                  <div v-else-if="schedulingJobId === job.id" class="flex flex-wrap items-center gap-2 animate-in slide-in-from-top-1">
                                      <div class="flex items-center gap-1">
                                          <span class="text-xs text-gray-500 font-medium">Start:</span>
@@ -549,6 +593,43 @@ onUnmounted(() => {
         </div>
 
     </div>
+  </div>
+
+  <!-- Dismissal Confirmation Overlay -->
+  <div v-if="showDismissDialog" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeDismissDialog">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+          <div class="flex items-center gap-3 text-red-600 mb-4">
+              <AlertTriangle size="24" />
+              <h3 class="font-bold text-lg">Confirm Dismissal</h3>
+          </div>
+          
+          <p class="text-sm text-gray-600 mb-4">
+              Are you sure you want to dismiss this opportunity?
+          </p>
+
+          <div v-if="jobs.length > 0" class="bg-red-50 border border-red-100 rounded-lg p-3 mb-4">
+              <p class="text-xs font-bold text-red-700 uppercase mb-2">Warning: The following jobs will be deleted:</p>
+              <ul class="list-disc list-inside text-xs text-red-600 space-y-1 max-h-32 overflow-y-auto">
+                  <li v-for="job in jobs" :key="job.id">{{ job.title || job.type || 'Untitled Job' }}</li>
+              </ul>
+          </div>
+
+          <div class="mb-4">
+              <label class="block text-xs font-bold text-gray-700 mb-1">Reason for dismissal <span class="text-red-500">*</span></label>
+              <textarea 
+                  v-model="dismissReason"
+                  class="w-full text-sm border border-gray-300 rounded-lg p-2 focus:ring-red-500 focus:border-red-500"
+                  rows="3"
+                  placeholder="e.g. Current tenant cancelled service..."
+                  autoFocus
+              ></textarea>
+          </div>
+
+          <div class="flex justify-end gap-3">
+              <button @click="closeDismissDialog" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition">Cancel</button>
+              <button @click="confirmDismiss" class="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition">Confirm Dismissal</button>
+          </div>
+      </div>
   </div>
 
   <!-- Property Detail Modal (nested) -->

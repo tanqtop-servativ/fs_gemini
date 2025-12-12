@@ -29,6 +29,26 @@ export function useVisits() {
     }
 
     /**
+     * Update visit schedule
+     * @param {string} visitId
+     * @param {string} scheduledStart - ISO timestamp
+     * @param {string} [scheduledEnd] - ISO timestamp
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const updateVisit = async (visitId, scheduledStart, scheduledEnd = null) => {
+        const { data, error } = await supabase.rpc('update_visit_schedule', {
+            p_visit_id: visitId,
+            p_scheduled_start: scheduledStart,
+            p_scheduled_end: scheduledEnd
+        })
+
+        if (error) {
+            return { success: false, error: error.message }
+        }
+        return data
+    }
+
+    /**
      * Get visit details including worker statuses
      * @param {string} visitId
      * @returns {Promise<{success: boolean, data?: Object, error?: string}>}
@@ -80,6 +100,7 @@ export function useVisits() {
 
     return {
         createVisit,
+        updateVisit,
         getVisitDetails,
         fetchVisitsForJob,
         getArtifactsForVisit

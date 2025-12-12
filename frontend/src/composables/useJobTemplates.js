@@ -104,6 +104,17 @@ export function useJobTemplates() {
     }
 
     /**
+     * Reorder templates
+     * @param {Array<string>} ids - Ordered list of IDs
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const reorderTemplates = async (ids) => {
+        const { error } = await supabase.rpc('reorder_job_templates', { p_ids: ids })
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
+    /**
      * Fetch all job templates for the current tenant
      * @param {boolean} [includeArchived=false]
      * @returns {Promise<{success: boolean, templates?: Array, error?: string}>}
@@ -118,7 +129,8 @@ export function useJobTemplates() {
             .from('job_templates')
             .select('*')
             .eq('tenant_id', tenantId)
-            .order('name')
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true })
 
         if (!includeArchived) {
             query = query.is('deleted_at', null)
@@ -136,6 +148,7 @@ export function useJobTemplates() {
         saveTemplate,
         archiveTemplate,
         restoreTemplate,
-        listTemplates
+        listTemplates,
+        reorderTemplates
     }
 }

@@ -118,6 +118,17 @@ export function useServiceTemplates() {
     }
 
     /**
+     * Reorder templates
+     * @param {Array<string>} ids - Ordered list of IDs
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    const reorderTemplates = async (ids) => {
+        const { error } = await supabase.rpc('reorder_service_templates', { p_ids: ids })
+        if (error) return { success: false, error: error.message }
+        return { success: true }
+    }
+
+    /**
      * Fetch all templates for the current tenant
      * @returns {Promise<{success: boolean, templates?: Array, error?: string}>}
      */
@@ -132,6 +143,7 @@ export function useServiceTemplates() {
             .select('*, service_workflow_steps(*, job_templates(name))')
             .eq('tenant_id', tenantId)
             .is('deleted_at', null)
+            .order('sort_order', { ascending: true })
             .order('name')
 
         if (error) {
@@ -144,6 +156,7 @@ export function useServiceTemplates() {
         saveTemplate,
         deleteTemplate,
         getTemplate,
-        listTemplates
+        listTemplates,
+        reorderTemplates
     }
 }

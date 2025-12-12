@@ -51,11 +51,12 @@ SELECT
     'Job' as event_type,
     CASE 
         WHEN v.status = 'Completed' THEN '#10b981' -- Emerald
-        WHEN v.status = 'In Progress' THEN '#0ea5e9' -- Sky Blue
-        WHEN v.status = 'Scheduled' THEN '#8b5cf6' -- Violet
-        ELSE '#6366f1' -- Indigo
+        WHEN v.status = 'In Progress' THEN '#2563eb' -- Blue-600 (Active)
+        WHEN v.status = 'Scheduled' THEN '#0ea5e9' -- Sky-500 (Planned)
+        ELSE '#64748b' -- Slate-500 (Default)
     END as color,
     CASE
+        WHEN j.status = 'Complete' THEN 'status-completed'
         WHEN v.status = 'Completed' THEN 'status-completed'
         WHEN v.status = 'In Progress' THEN 'status-started'
         ELSE ''

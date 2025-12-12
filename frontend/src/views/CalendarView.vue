@@ -113,7 +113,9 @@ const calendarOptions = {
   allDaySlot: true,
   slotMinTime: '06:00:00',
   slotMaxTime: '22:00:00',
-  views: {
+  slotEventOverlap: false, // Place overlapping events side-by-side
+  eventMinHeight: 45, // Ensure 15m events are tall enough for text
+   views: {
     multiMonth1: { type: 'dayGridMonth', duration: { months: 1 }, showNonCurrentDates: true },
     multiMonth2: { type: 'multiMonthYear', duration: { months: 2 }, multiMonthMaxColumns: 2, showNonCurrentDates: false },
     multiMonth3: { type: 'multiMonthYear', duration: { months: 3 }, multiMonthMaxColumns: 3, showNonCurrentDates: false },
@@ -124,13 +126,19 @@ const calendarOptions = {
   events: [], // Will be populated
   eventContent: (arg) => {
     const props = arg.event.extendedProps
+    const isCompleted = arg.event.classNames?.includes('status-completed')
+    // Bigger, bolder checkmark (increased to 1.3em), darker green
+    const checkmark = isCompleted ? '<span style="color: #16a34a; margin-right: 4px; font-weight: 900; font-size: 1.3em;">✓</span>' : ''
+    // Remove strikethrough, keep opacity
+    const titleStyle = isCompleted ? 'opacity: 0.7;' : ''
+    
     // Simplified content for MultiMonth view to avoid overflow (except for 1-month view which is now DayGrid/DayGridMonth)
     // Note: arg.view.type is the resolved type (e.g. 'dayGridMonth' or 'multiMonthYear')
     // Wait, in my config multiMonth1 IS dayGridMonth.
     // So if it's multiMonthYear (2-6), use simplified.
     if (arg.view.type === 'multiMonthYear') {
       return {
-        html: `<div class="text-[10px] truncate px-1 rounded-sm leading-tight" style="color:${arg.event.textColor || '#fff'}">${arg.event.title}</div>`
+        html: `<div class="text-[10px] truncate px-1 rounded-sm leading-tight" style="color:${arg.event.textColor || '#fff'}; ${titleStyle}">${checkmark}${arg.event.title}</div>`
       }
     }
     
@@ -138,7 +146,7 @@ const calendarOptions = {
     return {
       html: `
       <div class="px-1 py-px overflow-hidden h-full flex flex-col justify-center leading-none">
-          <div class="font-bold text-[10px] truncate mb-px">${arg.event.title}</div>
+          <div class="font-bold text-[10px] truncate mb-px" style="${titleStyle}">${checkmark}${arg.event.title}</div>
           ${props.property_name ? `<div class="text-[9px] truncate opacity-90">${props.property_name}</div>` : ''}
       </div>`
     }

@@ -1,13 +1,15 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { supabase } from '../lib/supabase'
-import { Plus, Eye, ListChecks } from 'lucide-vue-next'
+import { Plus, Eye, ListChecks, GripVertical } from 'lucide-vue-next'
+import draggable from 'vuedraggable'
 import JobTemplateFormModal from '../components/jobs/JobTemplateFormModal.vue'
 import JobTemplateDetailModal from '../components/jobs/JobTemplateDetailModal.vue'
 import SortableHeader from '../components/SortableHeader.vue'
 import TableSearch from '../components/TableSearch.vue'
 import { useAuth } from '../composables/useAuth'
 import { useTableControls } from '../composables/useTableControls'
+import { useJobTemplates } from '../composables/useJobTemplates'
 
 const templates = ref([])
 const loading = ref(true)
@@ -19,16 +21,39 @@ const showDetail = ref(false)
 const selectedTemplate = ref(null)
 
 const { userProfile } = useAuth()
+const { reorderTemplates } = useJobTemplates()
 
 // Table controls
 const { 
     sortKey, sortDir, searchQuery, 
     processedItems, toggleSort, resetControls, hasActiveControls 
 } = useTableControls(templates, {
-    defaultSortKey: 'name',
+    /* Set default sort to null so it uses natural order (sort_order from DB) */
+    defaultSortKey: null, 
     defaultSortDir: 'asc',
     searchableFields: ['name', 'name_es', 'description']
 })
+
+const canDrag = computed(() => {
+    // Only allow drag if no search, no archive, and default sort (null or sort_order)
+    return !searchQuery.value && !showArchived.value && (!sortKey.value || sortKey.value === 'sort_order')
+})
+
+const dragList = computed({
+    get: () => processedItems.value,
+    set: (newVal) => {
+        // Optimistically update main list
+        // Since we are not filtering/searching, processedItems IS templates (minus archived, which are hidden)
+        // If showArchived is false, templates == processedItems.
+        // We can safely replace templates.value with newVal
+        templates.value = newVal
+    }
+})
+
+const handleDragEnd = async () => {
+    const ids = templates.value.map(t => t.id)
+    await reorderTemplates(ids)
+}
 
 const fetchData = async () => {
     const tenantId = userProfile.value?.tenant_id
@@ -39,6 +64,7 @@ const fetchData = async () => {
     let query = supabase
         .from('job_templates')
         .select('*, job_template_tasks(*, job_template_checklist_items(*))')
+        .order('sort_order', { ascending: true })
         .order('name')
     
     if (tenantId) query = query.eq('tenant_id', tenantId)
@@ -116,6 +142,7 @@ const handleSaved = () => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
+            <th class="w-8 px-0 pl-4 py-4"></th> <!-- Drag Handle -->
             <th class="px-6 py-4">
                 <SortableHeader :sort-key="sortKey" column="name" :sort-dir="sortDir" @sort="toggleSort">Template Name</SortableHeader>
             </th>
@@ -126,40 +153,60 @@ const handleSaved = () => {
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <draggable 
+            v-model="dragList" 
+            tag="tbody" 
+            item-key="id"
+            handle=".drag-handle"
+            :disabled="!canDrag"
+            class="divide-y divide-gray-100"
+            @end="handleDragEnd"
+        >
+          <template #item="{ element: t }">
+            <tr class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
+               <!-- Drag Handle -->
+               <td class="pl-4 py-4 w-8 cursor-grab active:cursor-grabbing drag-handle text-gray-300 hover:text-gray-500" :class="{ 'opacity-0 pointer-events-none': !canDrag }">
+                   <GripVertical size="16" />
+               </td>
+               <!-- Name -->
+               <td class="px-6 py-4">
+                   <div class="font-bold text-slate-900 flex items-center gap-2" :class="{ 'line-through text-gray-500': t.deleted_at }">
+                       {{ t.name }}
+                       <span v-if="t.deleted_at" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase no-underline">Archived</span>
+                   </div>
+                   <div class="text-xs text-blue-500 font-medium" v-if="t.name_es">{{ t.name_es }}</div>
+               </td>
+               <!-- Description -->
+               <td class="px-6 py-4 max-w-xs">
+                   <div class="text-sm text-slate-600 truncate">{{ t.description || '-' }}</div>
+               </td>
+               <!-- Tasks -->
+               <td class="px-6 py-4">
+                   <span class="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold flex items-center w-fit">
+                       <ListChecks size="12" class="mr-1"/>
+                       {{ t.job_template_tasks ? t.job_template_tasks.length : 0 }} Tasks
+                   </span>
+               </td>
+               <!-- Actions -->
+               <td class="px-6 py-4 text-right" @click.stop>
+                   <button @click="openDetail(t)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
+                       <Eye size="16" />
+                   </button>
+               </td>
+            </tr>
+          </template>
+        </draggable>
+        
+        <!-- Empty/Loading States (moved outside tbody/draggable or handled via v-if check on tbody wrapper?) 
+             vuedraggable renders the tag (tbody). So if empty, tbody is empty. 
+             We can overlay loading/empty state or check list length.
+        -->
+        <tbody v-if="processedItems.length === 0">
            <tr v-if="loading">
-             <td colspan="4" class="px-6 py-8 text-center text-gray-400">Loading templates...</td>
+             <td colspan="5" class="px-6 py-8 text-center text-gray-400">Loading templates...</td>
            </tr>
-           <tr v-else-if="processedItems.length === 0">
-             <td colspan="4" class="px-6 py-8 text-center text-gray-400">No templates found. Create one to get started.</td>
-           </tr>
-
-           <tr v-for="t in processedItems" :key="t.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
-             <!-- Name -->
-             <td class="px-6 py-4">
-                 <div class="font-bold text-slate-900 flex items-center gap-2" :class="{ 'line-through text-gray-500': t.deleted_at }">
-                     {{ t.name }}
-                     <span v-if="t.deleted_at" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase no-underline">Archived</span>
-                 </div>
-                 <div class="text-xs text-blue-500 font-medium" v-if="t.name_es">{{ t.name_es }}</div>
-             </td>
-             <!-- Description -->
-             <td class="px-6 py-4 max-w-xs">
-                 <div class="text-sm text-slate-600 truncate">{{ t.description || '-' }}</div>
-             </td>
-             <!-- Tasks -->
-             <td class="px-6 py-4">
-                 <span class="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold flex items-center w-fit">
-                     <ListChecks size="12" class="mr-1"/>
-                     {{ t.job_template_tasks ? t.job_template_tasks.length : 0 }} Tasks
-                 </span>
-             </td>
-             <!-- Actions -->
-             <td class="px-6 py-4 text-right" @click.stop>
-                 <button @click="openDetail(t)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
-                     <Eye size="16" />
-                 </button>
-             </td>
+           <tr v-else>
+             <td colspan="5" class="px-6 py-8 text-center text-gray-400">No templates found. Create one to get started.</td>
            </tr>
         </tbody>
       </table>

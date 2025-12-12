@@ -173,14 +173,10 @@ export function useServiceOpportunities() {
      * @returns {Promise<{success: boolean, error?: string}>}
      */
     const dismissOpportunity = async (id, reason) => {
-        const { error } = await supabase
-            .from('service_opportunities')
-            .update({
-                status: 'Dismissed',
-                dismissal_reason: reason,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', id)
+        const { error } = await supabase.rpc('dismiss_service_opportunity', {
+            p_service_opportunity_id: id,
+            p_reason: reason
+        })
 
         if (error) return { success: false, error: error.message }
         return { success: true }
@@ -268,7 +264,7 @@ export function useServiceOpportunities() {
             if (ids.length > 0) {
                 const { data: jobs } = await supabase
                     .from('jobs')
-                    .select('id, service_opportunity_id, title, status')
+                    .select('id, service_opportunity_id, title, status, sort_order')
                     .in('service_opportunity_id', ids)
 
                 if (jobs) {

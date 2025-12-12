@@ -1,13 +1,15 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { supabase } from '../lib/supabase'
-import { Plus, Eye, GitMerge } from 'lucide-vue-next'
+import { Plus, Eye, GitMerge, GripVertical } from 'lucide-vue-next'
+import draggable from 'vuedraggable'
 import ServiceTemplateFormModal from '../components/services/ServiceTemplateFormModal.vue'
 import ServiceTemplateDetailModal from '../components/services/ServiceTemplateDetailModal.vue'
 import SortableHeader from '../components/SortableHeader.vue'
 import TableSearch from '../components/TableSearch.vue'
 import { useAuth } from '../composables/useAuth'
 import { useTableControls } from '../composables/useTableControls'
+import { useServiceTemplates } from '../composables/useServiceTemplates'
 
 const templates = ref([])
 const loading = ref(true)
@@ -18,16 +20,34 @@ const showDetail = ref(false)
 const selectedTemplate = ref(null)
 
 const { userProfile } = useAuth()
+const { reorderTemplates } = useServiceTemplates()
 
 // Table controls
 const { 
     sortKey, sortDir, searchQuery, 
     processedItems, toggleSort, resetControls, hasActiveControls 
 } = useTableControls(templates, {
-    defaultSortKey: 'name',
+    /* natural order */
+    defaultSortKey: null,
     defaultSortDir: 'asc',
     searchableFields: ['name', 'description']
 })
+
+const canDrag = computed(() => {
+    return !searchQuery.value && (!sortKey.value || sortKey.value === 'sort_order')
+})
+
+const dragList = computed({
+    get: () => processedItems.value,
+    set: (newVal) => {
+        templates.value = newVal
+    }
+})
+
+const handleDragEnd = async () => {
+    const ids = templates.value.map(t => t.id)
+    await reorderTemplates(ids)
+}
 
 const fetchData = async () => {
     // If profile not ready, skip. Watcher will re-trigger.
@@ -40,6 +60,7 @@ const fetchData = async () => {
         .select('*, service_workflow_steps(*, job_templates(name))')
         .eq('tenant_id', tenantId)
         .is('deleted_at', null)
+        .order('sort_order', { ascending: true })
         .order('name')
 
     templates.value = data || []
@@ -105,6 +126,7 @@ const handleSaved = () => {
       <table class="w-full text-left border-collapse">
         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-gray-200">
           <tr>
+            <th class="w-8 px-0 pl-4 py-4"></th> <!-- Drag Handle -->
             <th class="px-6 py-4">
                 <SortableHeader :sort-key="sortKey" column="name" :sort-dir="sortDir" @sort="toggleSort">Service Name</SortableHeader>
             </th>
@@ -115,49 +137,65 @@ const handleSaved = () => {
             <th class="px-6 py-4 text-xs uppercase text-gray-500 font-semibold tracking-wider text-right">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-           <tr v-if="loading">
-             <td colspan="4" class="px-6 py-8 text-center text-gray-400">Loading services...</td>
-           </tr>
-           <tr v-else-if="processedItems.length === 0">
-             <td colspan="4" class="px-6 py-8 text-center text-gray-400">No services defined. Create one to get started.</td>
-           </tr>
+        <draggable 
+            v-model="dragList" 
+            tag="tbody" 
+            item-key="id"
+            handle=".drag-handle"
+            :disabled="!canDrag"
+            class="divide-y divide-gray-100"
+            @end="handleDragEnd"
+        >
+          <template #item="{ element: t }">
+            <tr class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
+               <!-- Drag Handle -->
+               <td class="pl-4 py-4 w-8 cursor-grab active:cursor-grabbing drag-handle text-gray-300 hover:text-gray-500" :class="{ 'opacity-0 pointer-events-none': !canDrag }">
+                   <GripVertical size="16" />
+               </td>
+               <!-- Name -->
+               <td class="px-6 py-4">
+                   <div class="font-bold text-slate-900">{{ t.name }}</div>
+               </td>
+               <!-- Description -->
+               <td class="px-6 py-4 max-w-xs">
+                   <div class="text-sm text-slate-600 truncate">{{ t.description || '-' }}</div>
+               </td>
+               <!-- Steps -->
+               <td class="px-6 py-4">
+                   <div class="flex flex-col gap-1" v-if="t.service_workflow_steps && t.service_workflow_steps.length">
+                       <span class="bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold w-fit flex items-center mb-1">
+                           <GitMerge size="10" class="mr-1"/>
+                           {{ t.service_workflow_steps.length }} Steps
+                       </span>
+                       <div class="text-[10px] text-gray-400 truncate max-w-[200px]">
+                           {{ 
+                              t.service_workflow_steps
+                              .sort((a,b)=>a.sort_order-b.sort_order)
+                              .map(s => s.job_templates?.name || '?')
+                              .slice(0, 3)
+                              .join(' → ') 
+                           }}
+                           {{ t.service_workflow_steps.length > 3 ? '...' : '' }}
+                       </div>
+                   </div>
+                   <span v-else class="text-gray-400 text-xs italic">No steps</span>
+               </td>
+               <!-- Actions -->
+               <td class="px-6 py-4 text-right" @click.stop>
+                   <button @click="openDetail(t)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
+                       <Eye size="16" />
+                   </button>
+               </td>
+            </tr>
+          </template>
+        </draggable>
 
-           <tr v-for="t in processedItems" :key="t.id" class="group hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(t)">
-             <!-- Name -->
-             <td class="px-6 py-4">
-                 <div class="font-bold text-slate-900">{{ t.name }}</div>
-             </td>
-             <!-- Description -->
-             <td class="px-6 py-4 max-w-xs">
-                 <div class="text-sm text-slate-600 truncate">{{ t.description || '-' }}</div>
-             </td>
-             <!-- Steps -->
-             <td class="px-6 py-4">
-                 <div class="flex flex-col gap-1" v-if="t.service_workflow_steps && t.service_workflow_steps.length">
-                     <span class="bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold w-fit flex items-center mb-1">
-                         <GitMerge size="10" class="mr-1"/>
-                         {{ t.service_workflow_steps.length }} Steps
-                     </span>
-                     <div class="text-[10px] text-gray-400 truncate max-w-[200px]">
-                         {{ 
-                            t.service_workflow_steps
-                            .sort((a,b)=>a.sort_order-b.sort_order)
-                            .map(s => s.job_templates?.name || '?')
-                            .slice(0, 3)
-                            .join(' → ') 
-                         }}
-                         {{ t.service_workflow_steps.length > 3 ? '...' : '' }}
-                     </div>
-                 </div>
-                 <span v-else class="text-gray-400 text-xs italic">No steps</span>
-             </td>
-             <!-- Actions -->
-             <td class="px-6 py-4 text-right" @click.stop>
-                 <button @click="openDetail(t)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition">
-                     <Eye size="16" />
-                 </button>
-             </td>
+        <tbody v-if="processedItems.length === 0">
+           <tr v-if="loading">
+             <td colspan="5" class="px-6 py-8 text-center text-gray-400">Loading services...</td>
+           </tr>
+           <tr v-else>
+             <td colspan="5" class="px-6 py-8 text-center text-gray-400">No services defined. Create one to get started.</td>
            </tr>
         </tbody>
       </table>
