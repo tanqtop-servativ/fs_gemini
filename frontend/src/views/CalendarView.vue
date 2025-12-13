@@ -12,10 +12,12 @@ import 'tippy.js/dist/tippy.css'
 import 'tippy.js/themes/light-border.css'
 import { useAuth } from '../composables/useAuth'
 import { useCalendar } from '../composables/useCalendar'
+import { supabase } from '../lib/supabase'
 import CalendarEventModal from '../components/calendar/CalendarEventModal.vue'
 import ServiceOpportunityFormModal from '../components/services/ServiceOpportunityFormModal.vue'
 import JobDetailModal from '../components/jobs/JobDetailModal.vue'
 import { perfLog } from '../lib/perfLog'
+import { UserPlus, X, Check } from 'lucide-vue-next'
 import { useDebugLifecycle } from '../composables/useDebugLifecycle'
 
 useDebugLifecycle('CalendarView')
@@ -44,7 +46,20 @@ const contextMenuY = ref(0)
 const contextMenuEvent = ref(null)
 const contextMenuDate = ref(null)
 
-const closeContextMenu = () => {
+// Worker assignment state
+const showAssignModal = ref(false)
+const assignModalJob = ref(null)
+const availableWorkers = ref([])
+const currentAssignmentIds = ref([]) // person_ids already assigned
+const selectedWorkerIds = ref([]) // checkbox selections
+const requiredRoleIds = ref([])
+const assignmentLoading = ref(false)
+const assignmentSaving = ref(false)
+
+const closeContextMenu = (e) => {
+  // Don't close if clicking inside the assign modal
+  if (showAssignModal.value) return
+  
   showContextMenu.value = false
   contextMenuEvent.value = null
   contextMenuDate.value = null
@@ -291,6 +306,130 @@ const handleOpportunitySaved = () => {
   fetchEvents() // Refresh calendar
 }
 
+// Worker Assignment Functions
+const openAssignWorkers = async () => {
+  const jobId = contextMenuEvent.value?.extendedProps?.job_id
+  if (!jobId) return
+  
+  // Save job ID before closing context menu
+  const savedJobId = jobId
+  closeContextMenu()
+  assignmentLoading.value = true
+  showAssignModal.value = true
+  
+  // Fetch job details via RPC
+  const { data: jobData, error: jobError } = await supabase.rpc('get_job_detail', { p_job_id: savedJobId })
+  
+  if (jobError || !jobData) {
+    console.error('Failed to fetch job:', jobError)
+    showAssignModal.value = false
+    assignmentLoading.value = false
+    return
+  }
+  
+  assignModalJob.value = jobData
+  
+  // Fetch job_template_id separately (not included in get_job_detail RPC)
+  const { data: jobTemplateData } = await supabase.rpc('get_job_template_id', { p_job_id: savedJobId })
+  const jobTemplateId = jobTemplateData
+  
+  // Fetch required roles for this job template
+  if (jobTemplateId) {
+    const { data: roles } = await supabase
+      .from('job_template_roles')
+      .select('role_id')
+      .eq('job_template_id', jobTemplateId)
+    
+    requiredRoleIds.value = (roles || []).map(r => r.role_id)
+    console.log('Required roles for job:', requiredRoleIds.value)
+  } else {
+    requiredRoleIds.value = []
+    console.log('No job template, showing all workers')
+  }
+  
+  // Fetch current assignments
+  const { data: assignments } = await supabase
+    .from('job_assignments')
+    .select('person_id')
+    .eq('job_id', savedJobId)
+  
+  currentAssignmentIds.value = (assignments || []).map(a => a.person_id)
+  selectedWorkerIds.value = [...currentAssignmentIds.value]
+  
+  // Fetch available workers with their roles
+  const { data: people } = await supabase
+    .from('people')
+    .select('id, first_name, last_name, person_roles(role_id, roles(name))')
+    .is('deleted_at', null)
+    .order('first_name')
+  
+  // Filter by required roles if any
+  if (requiredRoleIds.value.length > 0) {
+    availableWorkers.value = (people || []).filter(p => {
+      const personRoleIds = (p.person_roles || []).map(pr => pr.role_id)
+      return requiredRoleIds.value.some(reqId => personRoleIds.includes(reqId))
+    })
+  } else {
+    availableWorkers.value = people || []
+  }
+  
+  assignmentLoading.value = false
+}
+
+const toggleWorker = (personId) => {
+  const idx = selectedWorkerIds.value.indexOf(personId)
+  if (idx >= 0) {
+    selectedWorkerIds.value.splice(idx, 1)
+  } else {
+    selectedWorkerIds.value.push(personId)
+  }
+}
+
+const saveAssignments = async () => {
+  if (!assignModalJob.value) return
+  assignmentSaving.value = true
+  
+  const jobId = assignModalJob.value.id
+  const toAdd = selectedWorkerIds.value.filter(id => !currentAssignmentIds.value.includes(id))
+  const toRemove = currentAssignmentIds.value.filter(id => !selectedWorkerIds.value.includes(id))
+  
+  // Add new assignments
+  for (const personId of toAdd) {
+    await supabase.rpc('assign_person_to_job', {
+      p_job_id: jobId,
+      p_person_id: personId
+    })
+  }
+  
+  // Remove unchecked assignments
+  for (const personId of toRemove) {
+    await supabase
+      .from('job_assignments')
+      .delete()
+      .eq('job_id', jobId)
+      .eq('person_id', personId)
+  }
+  
+  assignmentSaving.value = false
+  showAssignModal.value = false
+  assignModalJob.value = null
+  selectedWorkerIds.value = []
+  currentAssignmentIds.value = []
+  availableWorkers.value = []
+}
+
+const closeAssignModal = () => {
+  showAssignModal.value = false
+  assignModalJob.value = null
+  selectedWorkerIds.value = []
+  currentAssignmentIds.value = []
+  availableWorkers.value = []
+}
+
+const getWorkerRoles = (worker) => {
+  return (worker.person_roles || []).map(pr => pr.roles?.name).filter(Boolean).join(', ')
+}
+
 const { userProfile } = useAuth()
 const { fetchProperties: fetchPropertiesApi, fetchEvents: fetchEventsApi } = useCalendar()
 
@@ -427,6 +566,14 @@ const pageTitle = computed(() => {
         <button @click="copyEventToClipboard" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2">
           📄 Copy to Clipboard
         </button>
+        <!-- Assign Workers (only for Job events) -->
+        <button 
+          v-if="contextMenuEvent.extendedProps?.event_type === 'Job' && contextMenuEvent.extendedProps?.job_id"
+          @click="openAssignWorkers" 
+          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+        >
+          👥 Assign Workers
+        </button>
         <div class="border-t border-gray-100 my-1"></div>
         <button @click="createServiceOpportunity" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2">
           ➕ Create Service Opportunity
@@ -437,6 +584,96 @@ const pageTitle = computed(() => {
           ➕ Create Service Opportunity for {{ contextMenuDate }}
         </button>
       </template>
+    </div>
+
+    <!-- Worker Assignment Modal -->
+    <div 
+      v-if="showAssignModal" 
+      class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      @click.self="closeAssignModal"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+        <!-- Header -->
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+          <div>
+            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+              <UserPlus size="18" class="text-blue-600" />
+              Assign Workers
+            </h3>
+            <p v-if="assignModalJob" class="text-sm text-gray-500 mt-0.5">{{ assignModalJob.title }}</p>
+          </div>
+          <button @click="closeAssignModal" class="text-gray-400 hover:text-black p-1 rounded hover:bg-gray-100">
+            <X size="18" />
+          </button>
+        </div>
+        
+        <!-- Content -->
+        <div class="p-4 max-h-80 overflow-y-auto">
+          <!-- Loading -->
+          <div v-if="assignmentLoading" class="text-center text-gray-400 py-8">
+            Loading workers...
+          </div>
+          
+          <!-- Workers List -->
+          <div v-else-if="availableWorkers.length > 0" class="space-y-2">
+            <p v-if="requiredRoleIds.length > 0" class="text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded mb-3">
+              Showing only workers with required role(s) for this job type
+            </p>
+            
+            <label 
+              v-for="worker in availableWorkers" 
+              :key="worker.id"
+              class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+              :class="selectedWorkerIds.includes(worker.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-slate-50'"
+            >
+              <input 
+                type="checkbox"
+                :checked="selectedWorkerIds.includes(worker.id)"
+                @change="toggleWorker(worker.id)"
+                class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              >
+              <div class="flex-1">
+                <div class="font-medium text-slate-800">
+                  {{ worker.first_name }} {{ worker.last_name }}
+                </div>
+                <div v-if="getWorkerRoles(worker)" class="text-xs text-gray-500">
+                  {{ getWorkerRoles(worker) }}
+                </div>
+              </div>
+              <Check v-if="selectedWorkerIds.includes(worker.id)" size="18" class="text-blue-600" />
+            </label>
+          </div>
+          
+          <!-- Empty State -->
+          <div v-else class="text-center text-gray-400 py-8">
+            <p>No workers available</p>
+            <p v-if="requiredRoleIds.length > 0" class="text-xs mt-1">No one has the required role(s) for this job.</p>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="p-4 border-t border-gray-100 flex justify-between items-center bg-slate-50">
+          <div class="text-sm text-gray-500">
+            {{ selectedWorkerIds.length }} selected
+          </div>
+          <div class="flex gap-2">
+            <button 
+              @click="closeAssignModal" 
+              class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+            >
+              Cancel
+            </button>
+            <button 
+              @click="saveAssignments" 
+              :disabled="assignmentSaving"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+            >
+              <span v-if="assignmentSaving">Saving...</span>
+              <span v-else>Save Assignments</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
