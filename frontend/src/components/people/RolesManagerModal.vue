@@ -25,7 +25,7 @@ const formName = ref('')
 const formDesc = ref('')
 const saving = ref(false)
 const { effectiveTenantId } = useAuth()
-const { listRoles: fetchRolesFromComposable, createRole, updateRole, toggleRoleArchive, updateRoleOrder } = useRoles()
+const { listRoles: fetchRolesFromComposable, createRole, updateRole, toggleRoleArchive, reorderRoles } = useRoles()
 
 watch(() => [props.isOpen, showArchived.value], async ([open]) => {
   if (open) {
@@ -121,12 +121,8 @@ const toggleArchive = async (role) => {
 
 // Handle drag reorder
 const onDragEnd = async () => {
-    const updates = roles.value.map((role, index) => ({
-        id: role.id,
-        sort_order: index
-    }))
-
-    await updateRoleOrder(updates)
+    const ids = roles.value.map(role => role.id)
+    await reorderRoles(ids)
 }
 
 const formatTime = (ts) => {

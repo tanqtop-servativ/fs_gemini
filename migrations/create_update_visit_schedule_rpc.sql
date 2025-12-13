@@ -13,8 +13,7 @@ BEGIN
     UPDATE visits
     SET 
         scheduled_start = p_scheduled_start,
-        scheduled_end = p_scheduled_end,
-        updated_at = NOW()
+        scheduled_end = p_scheduled_end
     WHERE id = p_visit_id
     RETURNING id INTO v_updated_id;
     

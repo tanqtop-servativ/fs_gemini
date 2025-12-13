@@ -103,6 +103,12 @@ const router = createRouter({
             name: 'power-user',
             component: () => import('../views/PowerUserView.vue'),
             meta: { requiresAuth: true }
+        },
+        {
+            path: '/design',
+            name: 'design-prototype',
+            component: () => import('../views/DesignPrototypeView.vue'),
+            meta: { requiresAuth: false } // Open for easy viewing
         }
     ]
 })

@@ -75,6 +75,7 @@ const resetForm = () => {
 
 const handleSave = async () => {
     if (!form.property_id) return alert("Property is required")
+    if (!form.service_template_id) return alert("Service Template is required")
     saving.value = true
 
     try {
@@ -171,7 +172,7 @@ onUnmounted(() => {
             
             <!-- Property -->
             <div>
-                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property</label>
+                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Property <span class="text-red-500">*</span></label>
                 <div class="relative">
                     <Building class="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
                     <select v-model="form.property_id" class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white" :disabled="opportunity">
@@ -183,7 +184,7 @@ onUnmounted(() => {
 
             <!-- Template -->
             <div>
-                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Service Template</label>
+                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Service Template <span class="text-red-500">*</span></label>
                 <div class="relative">
                     <FileText class="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
                     <select v-model="form.service_template_id" class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white">

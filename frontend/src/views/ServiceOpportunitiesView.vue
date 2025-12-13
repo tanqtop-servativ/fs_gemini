@@ -366,7 +366,7 @@ const handleContextMenu = (e, item) => {
              <td class="px-6 py-4">
                  <div v-if="jobsMap[item.id] && jobsMap[item.id].length > 0" class="flex flex-wrap items-center gap-1">
                      <div v-for="(job, idx) in jobsMap[item.id].slice().sort((a,b)=>(a.sort_order || 0) - (b.sort_order || 0))" :key="job.id" class="flex items-center">
-                         <div class="px-1.5 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap" :class="getWorkflowColor(job.status)">
+                         <div class="px-1.5 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap" :class="[getWorkflowColor(job.status), { 'line-through opacity-50': job.status === 'Cancelled' }]">
                              {{ job.title }}
                          </div>
                          <ArrowRight v-if="idx < jobsMap[item.id].length - 1" class="mx-1 text-black" size="14" stroke-width="2.5"/>

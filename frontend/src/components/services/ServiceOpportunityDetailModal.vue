@@ -5,7 +5,7 @@ import { useServiceOpportunities } from '../../composables/useServiceOpportuniti
 import { useVisits } from '../../composables/useVisits'
 import AuditHistory from '../AuditHistory.vue'
 import PropertyDetailModal from '../properties/PropertyDetailModal.vue'
-import { X, Play, AlertTriangle, CheckCircle2, Circle, ArrowRight, Pencil, CheckSquare, Square, Zap, Ban, Clock, Check, Calendar, ExternalLink } from 'lucide-vue-next'
+import { X, Play, AlertTriangle, CheckCircle2, Circle, ArrowRight, Pencil, CheckSquare, Square, Zap, Ban, Clock, Check, Calendar, ExternalLink, Trash2, RotateCcw } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -231,6 +231,46 @@ const generateWorkflow = async () => {
     generating.value = false
 }
 
+const deleteJob = async (job) => {
+    if (!confirm(`Delete job "${job.title || 'Untitled'}"? This will cancel any scheduled visits.`)) return
+    
+    // Cancel associated visits first
+    await supabase
+        .from('visits')
+        .update({ status: 'Aborted', scheduled_start: null, scheduled_end: null })
+        .eq('job_id', job.id)
+        .in('status', ['Scheduled', 'In Progress'])
+    
+    // Then cancel the job
+    const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'Cancelled', deleted_at: new Date().toISOString() })
+        .eq('id', job.id)
+    
+    if (error) {
+        alert("Error deleting job: " + error.message)
+    } else {
+        fetchJobs() // Refresh job list
+        emit('refresh') // Refresh parent view
+    }
+}
+
+const restoreJob = async (job) => {
+    if (!confirm(`Restore job "${job.title || 'Untitled'}"?`)) return
+    
+    const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'Pending', deleted_at: null })
+        .eq('id', job.id)
+    
+    if (error) {
+        alert("Error restoring job: " + error.message)
+    } else {
+        fetchJobs() // Refresh job list
+        emit('refresh') // Refresh parent view
+    }
+}
+
 const showDismissDialog = ref(false)
 const dismissReason = ref('')
 
@@ -335,10 +375,29 @@ const statusColor = (s) => {
     return map[s] || 'bg-gray-100 text-gray-600'
 }
 
+// Check for unscheduled active jobs
+const hasUnscheduledJobs = () => {
+    return jobs.value.some(job => 
+        job.status !== 'Cancelled' && 
+        job.status !== 'Completed' && 
+        !getJobSchedule(job)
+    )
+}
+
+// Close handler with unscheduled job warning
+const handleClose = () => {
+    if (hasUnscheduledJobs()) {
+        if (!confirm('Warning: Some jobs are not scheduled. Close anyway?')) {
+            return
+        }
+    }
+    emit('close')
+}
+
 // ESC Key Handler
 const handleKeydown = (e) => {
   if (e.key === 'Escape' && props.isOpen) {
-    emit('close')
+    handleClose()
   }
 }
 
@@ -352,7 +411,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="handleClose">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-200">
         
         <!-- Header -->
@@ -416,7 +475,7 @@ onUnmounted(() => {
                 <button @click="$emit('edit', opportunity)" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100" title="Edit Opportunity">
                     <Pencil size="16" />
                 </button>
-                <button @click="$emit('close')" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100">
+                <button @click="handleClose" class="text-gray-400 hover:text-black transition-colors p-2 rounded hover:bg-slate-100">
                     <X size="20" />
                 </button>
             </div>
@@ -476,7 +535,8 @@ onUnmounted(() => {
                      <!-- Horizontal Flow Visualization (Simple) -->
                      <div class="flex items-center gap-2 overflow-x-auto pb-2">
                          <div v-for="(job, idx) in jobs" :key="'flow-' + job.id" class="flex items-center">
-                             <div class="px-3 py-1 rounded text-xs font-bold border whitespace-nowrap" :class="statusColor(job.status)">
+                             <div class="flex items-center gap-1 px-3 py-1 rounded text-xs font-bold border whitespace-nowrap" :class="statusColor(job.status)">
+                                 <Clock v-if="!getJobSchedule(job) && job.status !== 'Cancelled' && job.status !== 'Completed'" size="12" class="text-red-500" />
                                  {{ job.title || job.type || 'Untitled' }}
                              </div>
                              <ArrowRight v-if="idx < jobs.length - 1" class="mx-2 text-gray-300" size="14" />
@@ -492,22 +552,43 @@ onUnmounted(() => {
                                     class="flex-1 bg-white p-2 rounded border border-gray-200 flex items-center justify-between cursor-pointer hover:border-blue-300 transition"
                                     @click="router.push(`/jobs/${job.id}`)"
                                  >
-                                    <h5 class="font-bold text-slate-800 text-sm">{{ job.title || job.type || 'Untitled' }}</h5>
+                                    <div class="flex items-center gap-2">
+                                        <Clock v-if="!getJobSchedule(job) && job.status !== 'Cancelled' && job.status !== 'Completed'" size="14" class="text-red-500" />
+                                        <h5 class="font-bold text-slate-800 text-sm">{{ job.title || job.type || 'Untitled' }}</h5>
+                                    </div>
                                     <span class="text-[10px] px-2 py-0.5 rounded font-bold" :class="statusColor(job.status)">{{ job.status }}</span>
                                  </div>
+                                 <!-- Restore button for cancelled jobs -->
+                                 <button 
+                                    v-if="job.status === 'Cancelled' || job.deleted_at"
+                                    @click="restoreJob(job)"
+                                    class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition"
+                                    title="Restore job"
+                                 >
+                                    <RotateCcw size="14" />
+                                 </button>
+                                 <!-- Delete button for active jobs -->
+                                 <button 
+                                    v-else
+                                    @click="deleteJob(job)"
+                                    class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition"
+                                    title="Delete job"
+                                 >
+                                    <Trash2 size="14" />
+                                 </button>
                              </div>
 
                              <!-- Schedule Section -->
                              <div class="mb-3 pl-14">
                                  <div 
-                                    v-if="getJobSchedule(job)" 
+                                    v-if="getJobSchedule(job) && schedulingJobId !== job.id" 
                                     @click="startScheduling(job.id, job.visits.find(v => v.scheduled_start))"
-                                    class="flex items-center gap-2 text-xs text-slate-600 bg-blue-50 rounded px-3 py-2 border border-blue-100 cursor-pointer hover:bg-blue-100 hover:border-blue-200 transition group/schedule"
+                                    class="flex items-center gap-2 text-xs text-slate-600 bg-amber-50 rounded px-3 py-2 border border-amber-200 cursor-pointer hover:bg-amber-100 hover:border-amber-300 transition group/schedule"
                                     title="Click to reschedule"
                                 >
-                                    <Calendar size="14" class="text-blue-500" />
+                                    <Calendar size="14" class="text-amber-600" />
                                     <span class="font-medium">{{ formatSchedule(getJobSchedule(job)) }}</span>
-                                    <Pencil size="12" class="ml-auto text-blue-400 opacity-0 group-hover/schedule:opacity-100" />
+                                    <Pencil size="12" class="ml-auto text-amber-500 opacity-0 group-hover/schedule:opacity-100" />
                                 </div>
                                  <div v-else-if="schedulingJobId === job.id" class="flex flex-wrap items-center gap-2 animate-in slide-in-from-top-1">
                                      <div class="flex items-center gap-1">
